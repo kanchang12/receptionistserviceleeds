@@ -422,7 +422,7 @@ def client_tickets():
     return render_template('client/tickets.html', tickets=tickets, status_filter=status_filter)
 
 
-@app.route('/dashboard/tickets/<ticket_id>/update', methods=['POST'])
+@app.route('/dashboard/tickets/<ticket_id>/update', methods=['POST', 'GET'])
 @login_required
 @client_required
 def client_update_ticket(ticket_id):
@@ -472,7 +472,7 @@ def client_settings():
     return render_template('client/settings.html', business=biz, knowledge_base=kb)
 
 
-@app.route('/dashboard/knowledge-base/add', methods=['POST'])
+@app.route('/dashboard/knowledge-base/add', methods=['POST', 'GET'])
 @login_required
 @client_required
 def client_add_kb():
@@ -487,7 +487,7 @@ def client_add_kb():
     return redirect(url_for('client_settings'))
 
 
-@app.route('/dashboard/knowledge-base/<kb_id>/delete', methods=['POST'])
+@app.route('/dashboard/knowledge-base/<kb_id>/delete', methods=['POST', 'GET'])
 @login_required
 @client_required
 def client_delete_kb(kb_id):
@@ -518,7 +518,7 @@ def client_onboarding():
     return render_template('client/onboarding.html', business=biz)
 
 
-@app.route('/dashboard/onboarding/start', methods=['POST'])
+@app.route('/dashboard/onboarding/start', methods=['POST', 'GET'])
 @login_required
 @client_required
 def client_start_onboarding():
@@ -606,7 +606,7 @@ def admin_clients():
     return render_template('admin/clients.html', clients=clients)
 
 
-@app.route('/admin/clients/<user_id>/activate', methods=['POST'])
+@app.route('/admin/clients/<user_id>/activate', methods=['POST', 'GET'])
 @login_required
 @admin_required
 def admin_activate_client(user_id):
@@ -618,7 +618,7 @@ def admin_activate_client(user_id):
     return redirect(url_for('admin_clients'))
 
 
-@app.route('/admin/clients/<user_id>/suspend', methods=['POST'])
+@app.route('/admin/clients/<user_id>/suspend', methods=['POST', 'GET'])
 @login_required
 @admin_required
 def admin_suspend_client(user_id):
@@ -638,7 +638,7 @@ def admin_numbers():
     return render_template('admin/numbers.html', numbers=numbers)
 
 
-@app.route('/admin/numbers/search', methods=['POST'])
+@app.route('/admin/numbers/search', methods=['POST', 'GET'])
 @login_required
 @admin_required
 def admin_search_numbers():
@@ -650,7 +650,7 @@ def admin_search_numbers():
                            available=numbers)
 
 
-@app.route('/admin/numbers/buy', methods=['POST'])
+@app.route('/admin/numbers/buy', methods=['POST', 'GET'])
 @login_required
 @admin_required
 def admin_buy_number():
@@ -665,7 +665,7 @@ def admin_buy_number():
     return redirect(url_for('admin_numbers'))
 
 
-@app.route('/admin/numbers/assign', methods=['POST'])
+@app.route('/admin/numbers/assign', methods=['POST', 'GET'])
 @login_required
 @admin_required
 def admin_assign_number():
@@ -681,7 +681,7 @@ def admin_assign_number():
 # TWILIO WEBHOOKS — THE CALL ENGINE
 # ───────────────────────────────────────────
 
-@app.route('/webhook/incoming-call', methods=['POST'])
+@app.route('/webhook/incoming-call', methods=['POST', 'GET'])
 def webhook_incoming_call():
     """Main entry: Twilio hits this when a call comes in to any of our numbers."""
     called_number = request.form.get('Called', '')
@@ -735,7 +735,7 @@ def webhook_incoming_call():
         mimetype='text/xml')
 
 
-@app.route('/webhook/gather-response', methods=['POST'])
+@app.route('/webhook/gather-response', methods=['POST', 'GET'])
 def webhook_gather_response():
     """Handle speech input from caller, generate AI response."""
     speech_result = request.form.get('SpeechResult', '')
@@ -811,7 +811,7 @@ def webhook_gather_response():
         mimetype='text/xml')
 
 
-@app.route('/webhook/transfer', methods=['POST'])
+@app.route('/webhook/transfer', methods=['POST', 'GET'])
 def webhook_transfer():
     biz_id = request.args.get('business_id', '')
     biz = query_db("SELECT * FROM businesses WHERE id=%s", (biz_id,), one=True)
@@ -824,7 +824,7 @@ def webhook_transfer():
     return Response(str(resp), mimetype='text/xml')
 
 
-@app.route('/webhook/call-status', methods=['POST'])
+@app.route('/webhook/call-status', methods=['POST', 'GET'])
 def webhook_call_status():
     """Twilio status callback — fires when call completes."""
     call_sid = request.form.get('CallSid', '')
@@ -898,7 +898,7 @@ def webhook_call_status():
     return '', 204
 
 
-@app.route('/webhook/voicemail-complete', methods=['POST'])
+@app.route('/webhook/voicemail-complete', methods=['POST', 'GET'])
 def webhook_voicemail_complete():
     recording_url = request.form.get('RecordingUrl', '')
     call_sid = request.form.get('CallSid', '')
@@ -910,7 +910,7 @@ def webhook_voicemail_complete():
     return Response(str(resp), mimetype='text/xml')
 
 
-@app.route('/webhook/call-fallback', methods=['POST'])
+@app.route('/webhook/call-fallback', methods=['POST', 'GET'])
 def webhook_call_fallback():
     resp = VoiceResponse()
     resp.say("We're experiencing technical difficulties. Please try again later.", voice='Polly.Amy')
@@ -918,19 +918,19 @@ def webhook_call_fallback():
     return Response(str(resp), mimetype='text/xml')
 
 
-@app.route('/webhook/recording-status', methods=['POST'])
+@app.route('/webhook/recording-status', methods=['POST', 'GET'])
 def webhook_recording_status():
     return '', 204
 
 
-@app.route('/webhook/incoming-sms', methods=['POST'])
+@app.route('/webhook/incoming-sms', methods=['POST', 'GET'])
 def webhook_incoming_sms():
     return '', 204
 
 
 # ─── ONBOARDING WEBHOOKS ──────────────────
 
-@app.route('/webhook/onboarding-start', methods=['POST'])
+@app.route('/webhook/onboarding-start', methods=['POST', 'GET'])
 def webhook_onboarding_start():
     """First question of the onboarding interview."""
     biz_id = request.args.get('business_id', '')
@@ -953,7 +953,7 @@ def webhook_onboarding_start():
         mimetype='text/xml')
 
 
-@app.route('/webhook/onboarding-answer', methods=['POST'])
+@app.route('/webhook/onboarding-answer', methods=['POST', 'GET'])
 def webhook_onboarding_answer():
     """Process an onboarding answer, move to next question."""
     speech = request.form.get('SpeechResult', '')
@@ -999,7 +999,7 @@ def webhook_onboarding_answer():
     return Response(twilio_service.twiml_onboarding_complete(), mimetype='text/xml')
 
 
-@app.route('/webhook/onboarding-next', methods=['POST', 'GET'])
+@app.route('/webhook/onboarding-next', methods=['POST', 'GET', 'GET'])
 def webhook_onboarding_next():
     """Skip to next onboarding question (when no speech detected)."""
     biz_id = request.args.get('business_id', '')
@@ -1016,7 +1016,7 @@ def webhook_onboarding_next():
     return Response(twilio_service.twiml_onboarding_complete(), mimetype='text/xml')
 
 
-@app.route('/webhook/onboarding-status', methods=['POST'])
+@app.route('/webhook/onboarding-status', methods=['POST', 'GET'])
 def webhook_onboarding_status():
     return '', 204
 
