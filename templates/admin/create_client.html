@@ -1,0 +1,74 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Create Client — Admin{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Create New Client</h1>
+    <p>Add a client and their business directly</p>
+</div>
+
+<div class="card" style="max-width:700px;">
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('admin_create_client') }}">
+            <h3 style="margin-bottom:16px;">Account Details</h3>
+            <div class="form-group">
+                <label>Name *</label>
+                <input type="text" name="name" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Email *</label>
+                <input type="email" name="email" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Phone</label>
+                <input type="tel" name="phone" class="form-control" placeholder="+44...">
+            </div>
+            <div class="form-group">
+                <label>Password *</label>
+                <input type="text" name="password" class="form-control" required>
+            </div>
+
+            <h3 style="margin:24px 0 16px;">Business Details</h3>
+            <div class="form-group">
+                <label>Business Name *</label>
+                <input type="text" name="business_name" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Business Type</label>
+                <input type="text" name="business_type" class="form-control" placeholder="e.g. Plumbing, Dental, Restaurant">
+            </div>
+            <div class="form-group">
+                <label>Tier</label>
+                <select name="tier" class="form-control">
+                    <option value="starter">Starter (£29/mo)</option>
+                    <option value="growth" selected>Growth (£79/mo)</option>
+                    <option value="enterprise">Enterprise (£199/mo)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select name="status" class="form-control">
+                    <option value="active" selected>Active</option>
+                    <option value="pending">Pending</option>
+                </select>
+            </div>
+
+            <h3 style="margin:24px 0 16px;">AI Receptionist Prompt</h3>
+            <div class="form-group">
+                <label>Greeting</label>
+                <textarea name="greeting" class="form-control" rows="3" placeholder="Hello, thank you for calling [Business]. How can I help you today?"></textarea>
+                <small style="color:var(--text-muted);">What the AI says when it picks up the phone</small>
+            </div>
+            <div class="form-group">
+                <label>Agent Personality / System Prompt</label>
+                <textarea name="agent_personality" class="form-control" rows="6" placeholder="You are a friendly, professional receptionist for [Business]. You help callers with bookings, enquiries, and route urgent matters to the team. You speak clearly and concisely."></textarea>
+                <small style="color:var(--text-muted);">This controls how the AI behaves on calls — tone, knowledge, rules, what to say/not say</small>
+            </div>
+
+            <div style="display:flex;gap:12px;margin-top:24px;">
+                <button type="submit" class="btn btn-primary">Create Client</button>
+                <a href="{{ url_for('admin_dashboard') }}" class="btn" style="background:var(--bg-secondary);">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
