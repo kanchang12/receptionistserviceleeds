@@ -643,7 +643,48 @@ def admin_activate_client(user_id):
     if biz:
         execute_db("UPDATE businesses SET status='active' WHERE id=%s", (biz['id'],))
     flash('Client activated.', 'success')
-    return redirect(url_for('admin_clients'))
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/clients/create', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_create_client():
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip().lower()
+        phone = request.form.get('phone', '').strip()
+        password = request.form.get('password', '').strip()
+        business_name = request.form.get('business_name', '').strip()
+        business_type = request.form.get('business_type', '').strip()
+        tier = request.form.get('tier', 'starter')
+        status = request.form.get('status', 'active')
+
+        if not all([name, email, password, business_name]):
+            flash('Name, email, password and business name are required.', 'error')
+            return render_template('admin/create_client.html')
+
+        existing = query_db("SELECT id FROM users WHERE email=%s", (email,), one=True)
+        if existing:
+            flash('Email already registered.', 'error')
+            return render_template('admin/create_client.html')
+
+        pw_hash = generate_password_hash(password)
+        user_id = insert_db(
+            "INSERT INTO users (name, email, phone, password_hash, role, status) VALUES (%s,%s,%s,%s,'client',%s) RETURNING id",
+            (name, email, phone, pw_hash, status))
+
+        if user_id:
+            greeting = request.form.get('greeting', '').strip()
+            agent_personality = request.form.get('agent_personality', '').strip()
+            biz_id = insert_db(
+                "INSERT INTO businesses (user_id, name, business_type, status, tier, greeting, agent_personality) VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+                (user_id, business_name, business_type, status, tier, greeting, agent_personality))
+            flash(f'Client {name} created successfully.', 'success')
+            return redirect(url_for('admin_dashboard'))
+
+        flash('Failed to create client.', 'error')
+    return render_template('admin/create_client.html')
 
 
 @app.route('/admin/clients/<user_id>/suspend', methods=['POST', 'GET'])
@@ -663,7 +704,8 @@ def admin_numbers():
         SELECT p.*, b.name as business_name FROM phone_numbers p
         LEFT JOIN businesses b ON p.business_id=b.id ORDER BY p.created_at DESC
     """)
-    return render_template('admin/numbers.html', numbers=numbers)
+    businesses = query_db("SELECT id, name FROM businesses ORDER BY name")
+    return render_template('admin/numbers.html', numbers=numbers, businesses=businesses)
 
 
 @app.route('/admin/numbers/search', methods=['POST', 'GET'])
@@ -675,7 +717,8 @@ def admin_search_numbers():
     flash(f'Found {len(numbers)} available numbers.', 'info')
     return render_template('admin/numbers.html',
                            numbers=query_db("SELECT p.*, b.name as business_name FROM phone_numbers p LEFT JOIN businesses b ON p.business_id=b.id ORDER BY p.created_at DESC"),
-                           available=numbers)
+                           available=numbers,
+                           businesses=query_db("SELECT id, name FROM businesses ORDER BY name"))
 
 
 @app.route('/admin/numbers/buy', methods=['POST', 'GET'])
