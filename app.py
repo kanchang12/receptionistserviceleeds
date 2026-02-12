@@ -1014,10 +1014,6 @@ def webhook_call_status():
 
         # Decrement active calls
         cache_decr(f"active_calls:{biz_id}")
-        else:
-            # No call record found — still try to mark it
-            execute_db("""UPDATE calls SET status='completed', duration_seconds=%s, completed_at=NOW()
-                          WHERE twilio_call_sid=%s""", (duration, call_sid))
 
     elif status in ('busy', 'no-answer', 'canceled', 'failed'):
         execute_db("UPDATE calls SET status='missed' WHERE twilio_call_sid=%s", (call_sid,))
