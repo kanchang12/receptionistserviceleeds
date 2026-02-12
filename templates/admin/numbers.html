@@ -57,15 +57,16 @@
                 <td>{{ n.business_name or '—' }}</td>
                 <td><span class="badge badge-{{ 'green' if n.status == 'assigned' else 'orange' }}">{{ n.status }}</span></td>
                 <td>
-                    {% if n.status == 'available' %}
                     <form method="POST" action="{{ url_for('admin_assign_number') }}" class="form-inline">
                         <input type="hidden" name="number_id" value="{{ n.id }}">
-                        <input type="text" name="business_id" class="form-input" style="width:240px;" placeholder="Business ID">
-                        <button class="btn btn-sm btn-secondary">Assign</button>
+                        <select name="business_id" class="form-select" style="width:auto;" required>
+                            <option value="">Select business</option>
+                            {% for b in businesses %}
+                            <option value="{{ b.id }}" {% if n.business_id == b.id %}selected{% endif %}>{{ b.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="btn btn-sm btn-secondary">{% if n.status == 'assigned' %}Reassign{% else %}Assign{% endif %}</button>
                     </form>
-                    {% else %}
-                    Assigned
-                    {% endif %}
                 </td>
             </tr>
             {% endfor %}
