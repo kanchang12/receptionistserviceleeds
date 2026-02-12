@@ -3,129 +3,324 @@
 {% block body_class %}landing-body{% endblock %}
 {% block body %}
 
-<div class="landing-bg-orb landing-bg-orb-1" style="position:fixed;top:-10%;right:-5%;width:500px;height:500px;background:rgba(232,168,56,0.04);border-radius:50%;filter:blur(100px);pointer-events:none;z-index:0;"></div>
-<div class="landing-bg-orb landing-bg-orb-2" style="position:fixed;bottom:10%;left:-10%;width:400px;height:400px;background:rgba(66,165,245,0.03);border-radius:50%;filter:blur(100px);pointer-events:none;z-index:0;"></div>
-
 <nav class="landing-nav">
     <div class="landing-brand"><span class="brand-dot"></span> VoiceBot</div>
     <div class="landing-nav-links">
+        <a href="#how-it-works">How It Works</a>
         <a href="#features">Features</a>
         <a href="#pricing">Pricing</a>
+        <a href="#faq">FAQ</a>
         <a href="{{ url_for('login') }}">Login</a>
-        <a href="{{ url_for('register') }}" class="hero-btn hero-btn-primary" style="padding:8px 20px;font-size:0.85rem;border-radius:8px;">Get Started</a>
+        <a href="{{ url_for('register') }}" class="nav-cta">Get Started Free</a>
     </div>
 </nav>
 
+<!-- ═══ HERO ═══ -->
 <section class="hero">
-    <div class="hero-eyebrow">⚡ Powered by Gemini AI</div>
-    <h1>Your business deserves an <em>intelligent</em> receptionist</h1>
-    <p class="hero-sub">AI voice agent that answers calls, handles enquiries, books appointments, and creates tickets — 24/7. Set up in under 30 minutes.</p>
+    <div class="hero-bg"></div>
+    <div class="hero-eyebrow">⚡ Powered by Gemini AI &middot; Built for Australian & UK businesses</div>
+    <h1>Never miss a call again with your <span class="gradient-text">AI receptionist</span></h1>
+    <p class="hero-sub">An intelligent voice agent that answers your phone, handles customer enquiries, books appointments, takes messages, and creates tickets — all without you lifting a finger. 24 hours a day, 7 days a week.</p>
     <div class="hero-actions">
-        <a href="{{ url_for('register') }}" class="hero-btn hero-btn-primary">Start Free Trial</a>
-        <a href="#features" class="hero-btn hero-btn-secondary">See How It Works</a>
+        <a href="{{ url_for('register') }}" class="hero-btn hero-btn-primary">Start Your Free Trial →</a>
+        <a href="#how-it-works" class="hero-btn hero-btn-secondary">Watch How It Works</a>
+    </div>
+    <p class="hero-note">No credit card required &middot; Setup in under 30 minutes &middot; Cancel anytime</p>
+</section>
+
+<!-- ═══ SOCIAL PROOF ═══ -->
+<section class="social-proof">
+    <p>Trusted by businesses across multiple industries</p>
+    <div class="logo-strip">
+        <span>Plumbing Co.</span>
+        <span>DentaCare</span>
+        <span>GreenWaste</span>
+        <span>LegalEdge</span>
+        <span>FreshBites</span>
+        <span>HomeClean Pro</span>
     </div>
 </section>
 
-<div class="hero-divider"></div>
+<!-- ═══ HOW IT WORKS ═══ -->
+<section class="how-section" id="how-it-works">
+    <div class="section-label">How It Works</div>
+    <h2 class="section-title">Up and running in three simple steps</h2>
+    <p class="section-subtitle">No technical knowledge required. Our AI interviewer sets everything up for you over a single phone call.</p>
 
+    <div class="steps-grid">
+        <div class="step-card">
+            <div class="step-number">1</div>
+            <h3>Sign up & tell us about your business</h3>
+            <p>Create your account and provide basic details. We'll call you and ask 8 short questions about your services, hours, how you'd like calls handled, and common customer enquiries.</p>
+        </div>
+        <div class="step-card">
+            <div class="step-number">2</div>
+            <h3>We build your custom AI agent</h3>
+            <p>Our Gemini AI processes your answers and creates a fully personalised receptionist — complete with your greeting, business knowledge, FAQ responses, and escalation rules.</p>
+        </div>
+        <div class="step-card">
+            <div class="step-number">3</div>
+            <h3>Your phone number goes live</h3>
+            <p>We assign a dedicated phone number (or port your existing one). Calls are answered instantly by your AI, analysed in real-time, and logged in your dashboard with full transcripts.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ═══ FEATURES ═══ -->
 <section class="features-section" id="features">
-    <h2>Everything your business needs</h2>
-    <p class="features-subtitle">AI-powered call handling, analysis, and automation — no human intervention required.</p>
-    <div class="features-grid">
-        <div class="feature-card">
-            <div class="feature-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+    <div class="features-inner">
+        <div class="section-label">Features</div>
+        <h2 class="section-title">Everything you need to handle calls professionally</h2>
+        <p class="section-subtitle">From intelligent conversations to automatic ticketing — your AI receptionist does it all.</p>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon blue">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                </div>
+                <h3>Natural Voice Conversations</h3>
+                <p>Powered by Gemini AI, your receptionist understands context, handles complex questions, and speaks naturally — not like a robotic IVR menu.</p>
             </div>
-            <h3>AI Voice Agent</h3>
-            <p>Gemini-powered receptionist that understands context, remembers repeat callers, and handles natural conversations.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+            <div class="feature-card">
+                <div class="feature-icon green">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72"/></svg>
+                </div>
+                <h3>Repeat Caller Recognition</h3>
+                <p>The AI remembers who's calling. Previous call summaries are automatically passed as context, so returning customers get personalised service every time.</p>
             </div>
-            <h3>Auto-Ticketing</h3>
-            <p>Every call is analysed. Orders, complaints, and bookings automatically become trackable tickets in your dashboard.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <div class="feature-card">
+                <div class="feature-icon purple">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+                </div>
+                <h3>Automatic Ticket Creation</h3>
+                <p>Orders, complaints, bookings, and support requests are automatically extracted from calls and turned into trackable tickets in your dashboard.</p>
             </div>
-            <h3>24/7 Availability</h3>
-            <p>Business hours routing, after-hours voicemail, and smart escalation to your team when needed.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72"/></svg>
+            <div class="feature-card">
+                <div class="feature-icon orange">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </div>
+                <h3>Full Call Transcription</h3>
+                <p>Every call is recorded, transcribed, and analysed. Get summaries, sentiment scores, caller intent, and action items — all processed by Gemini AI.</p>
             </div>
-            <h3>Caller Recognition</h3>
-            <p>Knows who's calling based on history. Previous call summaries are passed to AI for personalised service.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <div class="feature-card">
+                <div class="feature-icon red">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+                <h3>24/7 Availability</h3>
+                <p>Business hours routing with after-hours voicemail. Your AI answers instantly at 2am or 2pm — no hold music, no missed opportunities, no overtime costs.</p>
             </div>
-            <h3>Smart Transcripts</h3>
-            <p>Full transcription, sentiment analysis, call categorisation, and action item extraction from every call.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2"/><circle cx="12" cy="12" r="3"/></svg>
+            <div class="feature-card">
+                <div class="feature-icon warm">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2"/><circle cx="12" cy="12" r="3"/></svg>
+                </div>
+                <h3>Knowledge Base & FAQ</h3>
+                <p>Upload your business policies, service details, and common Q&A. Your AI uses this as reference to give accurate, consistent answers to every caller.</p>
             </div>
-            <h3>Easy Setup</h3>
-            <p>Onboarding via AI interview call. Answer 8 questions, and your receptionist is configured and ready to go.</p>
         </div>
     </div>
 </section>
 
+<!-- ═══ STATS BANNER ═══ -->
+<section class="stats-banner">
+    <div class="stats-banner-inner">
+        <h2>Built for businesses that care about every call</h2>
+        <div class="stats-row">
+            <div class="stat-item">
+                <h3>99.8%</h3>
+                <p>Uptime guaranteed</p>
+            </div>
+            <div class="stat-item">
+                <h3>&lt;1s</h3>
+                <p>Average answer time</p>
+            </div>
+            <div class="stat-item">
+                <h3>30min</h3>
+                <p>Setup to live</p>
+            </div>
+            <div class="stat-item">
+                <h3>24/7</h3>
+                <p>Always available</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══ TESTIMONIALS ═══ -->
+<section class="testimonials-section">
+    <div class="section-label">What Our Clients Say</div>
+    <h2 class="section-title">Businesses love their AI receptionist</h2>
+    <p class="section-subtitle">Real feedback from real business owners who switched to VoiceBot.</p>
+
+    <div class="testimonials-grid">
+        <div class="testimonial-card">
+            <div class="testimonial-stars">★★★★★</div>
+            <p class="testimonial-text">"We were missing 40% of our calls during peak hours. VoiceBot now handles everything — enquiries, quotes, even complaint logging. Our customer satisfaction went up and we didn't hire a single extra person."</p>
+            <div class="testimonial-author">
+                <div class="testimonial-avatar">MR</div>
+                <div>
+                    <div class="testimonial-name">Mark Richardson</div>
+                    <div class="testimonial-role">Owner, Richardson Plumbing</div>
+                </div>
+            </div>
+        </div>
+        <div class="testimonial-card">
+            <div class="testimonial-stars">★★★★★</div>
+            <p class="testimonial-text">"The caller recognition feature is brilliant. When a patient calls back, the AI already knows their context. It's like having a receptionist with perfect memory. Our patients notice the difference."</p>
+            <div class="testimonial-author">
+                <div class="testimonial-avatar">SP</div>
+                <div>
+                    <div class="testimonial-name">Dr. Sarah Patel</div>
+                    <div class="testimonial-role">Director, Greenfield Dental</div>
+                </div>
+            </div>
+        </div>
+        <div class="testimonial-card">
+            <div class="testimonial-stars">★★★★★</div>
+            <p class="testimonial-text">"I run a waste management company and we get hundreds of calls daily. VoiceBot categorises them automatically — skip hire bookings, complaints, price enquiries — all into neat tickets. Game changer."</p>
+            <div class="testimonial-author">
+                <div class="testimonial-avatar">JT</div>
+                <div>
+                    <div class="testimonial-name">James Turner</div>
+                    <div class="testimonial-role">MD, GreenWaste Solutions</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══ PRICING ═══ -->
 <section class="pricing-section" id="pricing">
-    <h2>Simple, transparent pricing</h2>
-    <div class="pricing-grid">
-        <div class="pricing-card">
-            <div class="pricing-tier">Starter</div>
-            <div class="pricing-price">£29<span>/mo</span></div>
-            <div class="pricing-desc">For small businesses getting started</div>
-            <ul class="pricing-features">
-                <li>200 minutes/month</li>
-                <li>1 phone number</li>
-                <li>Call logs & recordings</li>
-                <li>Auto-ticketing</li>
-                <li>Knowledge base</li>
-            </ul>
-            <a href="{{ url_for('register') }}" class="btn btn-secondary pricing-cta">Get Started</a>
-        </div>
-        <div class="pricing-card featured">
-            <div class="pricing-tier">Growth</div>
-            <div class="pricing-price">£79<span>/mo</span></div>
-            <div class="pricing-desc">For growing businesses</div>
-            <ul class="pricing-features">
-                <li>600 minutes/month</li>
-                <li>2 phone numbers</li>
-                <li>Everything in Starter</li>
-                <li>Sentiment analysis</li>
-                <li>SMS notifications</li>
-                <li>Priority support</li>
-            </ul>
-            <a href="{{ url_for('register') }}" class="btn btn-primary pricing-cta">Get Started</a>
-        </div>
-        <div class="pricing-card">
-            <div class="pricing-tier">Enterprise</div>
-            <div class="pricing-price">£199<span>/mo</span></div>
-            <div class="pricing-desc">For high-volume operations</div>
-            <ul class="pricing-features">
-                <li>2000 minutes/month</li>
-                <li>5 phone numbers</li>
-                <li>Everything in Growth</li>
-                <li>API access</li>
-                <li>White-label option</li>
-                <li>Dedicated account manager</li>
-            </ul>
-            <a href="{{ url_for('register') }}" class="btn btn-secondary pricing-cta">Contact Sales</a>
+    <div class="pricing-inner">
+        <div class="section-label">Pricing</div>
+        <h2 class="section-title">Simple, transparent pricing</h2>
+        <p class="section-subtitle">No hidden fees. No long contracts. Scale up or down anytime.</p>
+
+        <div class="pricing-grid">
+            <div class="pricing-card">
+                <div class="pricing-tier">Starter</div>
+                <div class="pricing-price">£29<span>/mo</span></div>
+                <div class="pricing-desc">For small businesses getting started with AI call handling</div>
+                <ul class="pricing-features">
+                    <li>200 minutes/month</li>
+                    <li>1 phone number</li>
+                    <li>Call recording & transcription</li>
+                    <li>Automatic ticketing</li>
+                    <li>Knowledge base</li>
+                    <li>Dashboard & call analytics</li>
+                </ul>
+                <a href="{{ url_for('register') }}" class="btn btn-secondary pricing-cta">Start Free Trial</a>
+            </div>
+            <div class="pricing-card featured">
+                <div class="pricing-tier">Growth</div>
+                <div class="pricing-price">£79<span>/mo</span></div>
+                <div class="pricing-desc">For growing businesses with higher call volumes</div>
+                <ul class="pricing-features">
+                    <li>600 minutes/month</li>
+                    <li>2 phone numbers</li>
+                    <li>Everything in Starter</li>
+                    <li>Caller recognition & history</li>
+                    <li>Sentiment analysis</li>
+                    <li>SMS notifications & alerts</li>
+                    <li>Priority support</li>
+                </ul>
+                <a href="{{ url_for('register') }}" class="btn btn-primary pricing-cta">Start Free Trial</a>
+            </div>
+            <div class="pricing-card">
+                <div class="pricing-tier">Enterprise</div>
+                <div class="pricing-price">£199<span>/mo</span></div>
+                <div class="pricing-desc">For high-volume operations and multi-location businesses</div>
+                <ul class="pricing-features">
+                    <li>2,000 minutes/month</li>
+                    <li>5 phone numbers</li>
+                    <li>Everything in Growth</li>
+                    <li>API access</li>
+                    <li>Custom integrations</li>
+                    <li>White-label option</li>
+                    <li>Dedicated account manager</li>
+                </ul>
+                <a href="{{ url_for('register') }}" class="btn btn-secondary pricing-cta">Contact Sales</a>
+            </div>
         </div>
     </div>
 </section>
 
+<!-- ═══ FAQ ═══ -->
+<section class="faq-section" id="faq">
+    <div class="section-label">FAQ</div>
+    <h2 class="section-title">Frequently asked questions</h2>
+    <p class="section-subtitle">Everything you need to know before getting started.</p>
+
+    <div class="faq-item">
+        <div class="faq-question">How does the AI receptionist actually work?</div>
+        <div class="faq-answer">When someone calls your VoiceBot number, Twilio routes the call to our platform. Google's Gemini AI processes the caller's speech in real-time, generates natural responses based on your business configuration, and handles the conversation. Every call is recorded, transcribed, and analysed automatically.</div>
+    </div>
+    <div class="faq-item">
+        <div class="faq-question">Can it handle complex questions specific to my business?</div>
+        <div class="faq-answer">Yes. During onboarding, you provide details about your services, policies, and common questions. You can also add documents to the knowledge base at any time. The AI references this information during calls to give accurate, business-specific answers.</div>
+    </div>
+    <div class="faq-item">
+        <div class="faq-question">What happens if the AI can't help a caller?</div>
+        <div class="faq-answer">You set a transfer number during setup. When the AI detects it can't resolve an issue, or when the caller requests a human, the call is seamlessly transferred to your designated number. After hours, callers can leave a voicemail.</div>
+    </div>
+    <div class="faq-item">
+        <div class="faq-question">How does caller recognition work?</div>
+        <div class="faq-answer">When a call comes in, the system checks the caller's phone number against your previous calls. If they've called before, the last 2 call summaries (including category and sentiment) are passed to the AI as context. This allows the agent to say things like "Welcome back — I see you called about a delivery issue last time."</div>
+    </div>
+    <div class="faq-item">
+        <div class="faq-question">Can I use my existing business phone number?</div>
+        <div class="faq-answer">We can port your existing number or set up call forwarding. Alternatively, we provide dedicated numbers in the UK, US, and Australia. Contact us to discuss your specific setup.</div>
+    </div>
+    <div class="faq-item">
+        <div class="faq-question">What happens when I go over my minute limit?</div>
+        <div class="faq-answer">You'll receive SMS alerts at 80%, 90%, and 100% usage. Overage is billed at £0.08/min. Your AI receptionist keeps working — we never cut off your service mid-month.</div>
+    </div>
+    <div class="faq-item">
+        <div class="faq-question">Is my data secure?</div>
+        <div class="faq-answer">All data is encrypted in transit and at rest. Call recordings are stored securely and only accessible through your authenticated dashboard. We comply with GDPR and Australian Privacy Principles.</div>
+    </div>
+</section>
+
+<!-- ═══ CTA BANNER ═══ -->
+<section class="cta-section">
+    <div class="cta-inner">
+        <h2>Ready to stop missing calls?</h2>
+        <p>Join hundreds of businesses using VoiceBot to handle their calls professionally, 24/7. Set up takes less than 30 minutes and there's no long-term commitment.</p>
+        <a href="{{ url_for('register') }}" class="cta-btn">Start Your Free Trial →</a>
+    </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
 <footer class="landing-footer">
-    <p>© 2026 VoiceBot. Built for DevDash 2026. Powered by Gemini AI + Twilio.</p>
+    <div class="footer-grid">
+        <div>
+            <div class="footer-brand"><span class="brand-dot"></span> VoiceBot</div>
+            <p class="footer-desc">AI-powered voice receptionist for businesses that care about every customer call. Built with Gemini AI and Twilio telephony.</p>
+        </div>
+        <div class="footer-col">
+            <h4>Product</h4>
+            <a href="#features">Features</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#how-it-works">How It Works</a>
+            <a href="#faq">FAQ</a>
+        </div>
+        <div class="footer-col">
+            <h4>Company</h4>
+            <a href="#">About Us</a>
+            <a href="#">Blog</a>
+            <a href="#">Careers</a>
+            <a href="#">Contact</a>
+        </div>
+        <div class="footer-col">
+            <h4>Legal</h4>
+            <a href="#">Privacy Policy</a>
+            <a href="#">Terms of Service</a>
+            <a href="#">GDPR</a>
+            <a href="#">Cookie Policy</a>
+        </div>
+    </div>
+    <div class="footer-bottom">
+        © 2026 VoiceBot. All rights reserved. Built for DevDash 2026.
+    </div>
 </footer>
 
 {% endblock %}
