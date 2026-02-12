@@ -118,6 +118,15 @@ def cache_decr(key):
     return _mem_store[key]
 
 
+def safe_json(val, default=None):
+    """Parse JSON string or return as-is if already parsed by psycopg2."""
+    if val is None:
+        return default
+    if isinstance(val, (dict, list)):
+        return val
+    return json.loads(val)
+
+
 # ─── AUTH DECORATORS ───────────────────────
 
 def login_required(f):
@@ -946,9 +955,8 @@ def webhook_onboarding_start():
     biz_id = request.args.get('business_id', '')
     ob_id = request.args.get('onboarding_id', '')
 
-    # Read questions from database (not in-memory cache — fails across workers)
     row = query_db("SELECT questions_asked FROM onboarding_calls WHERE id=%s", (ob_id,), one=True)
-    questions = json.loads(row['questions_asked']) if row and row['questions_asked'] else []
+    questions = safe_json(row['questions_asked'], []) if row and row['questions_asked'] else []
 
     if not questions or len(questions) == 0:
         resp = VoiceResponse()
@@ -978,13 +986,13 @@ def webhook_onboarding_answer():
     questions = cache_get(f"onboarding_q:{ob_id}", as_json=True) or []
     if not questions:
         row = query_db("SELECT questions_asked FROM onboarding_calls WHERE id=%s", (ob_id,), one=True)
-        questions = json.loads(row['questions_asked']) if row and row['questions_asked'] else []
+        questions = safe_json(row['questions_asked'], []) if row and row['questions_asked'] else []
 
     # Store answer
     answers = cache_get(f"onboarding_a:{ob_id}", as_json=True) or {}
     if not answers:
         row2 = query_db("SELECT extracted_data FROM onboarding_calls WHERE id=%s", (ob_id,), one=True)
-        answers = json.loads(row2['extracted_data']) if row2 and row2['extracted_data'] else {}
+        answers = safe_json(row2['extracted_data'], {}) if row2 and row2['extracted_data'] else {}
     if q_idx < len(questions):
         field_name = questions[q_idx].get('field_name', f'question_{q_idx}')
         answers[field_name] = speech
@@ -1030,7 +1038,7 @@ def webhook_onboarding_next():
     questions = cache_get(f"onboarding_q:{ob_id}", as_json=True) or []
     if not questions:
         row = query_db("SELECT questions_asked FROM onboarding_calls WHERE id=%s", (ob_id,), one=True)
-        questions = json.loads(row['questions_asked']) if row and row['questions_asked'] else []
+        questions = safe_json(row['questions_asked'], []) if row and row['questions_asked'] else []
 
     if q_idx < len(questions):
         return Response(
