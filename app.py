@@ -964,15 +964,18 @@ def webhook_onboarding_start():
         resp.hangup()
         return Response(str(resp), mimetype='text/xml')
 
-    # Welcome message + first question
+    # Welcome message + first question — all in one Response
     resp = VoiceResponse()
     resp.say("Hello! I'm going to ask you a few questions to set up your AI receptionist. Let's get started!",
              voice='Polly.Amy', language='en-GB')
     resp.pause(length=1)
-    return Response(
-        str(resp) + twilio_service.twiml_onboarding_question(
-            questions[0]['question'], biz_id, ob_id, 0),
-        mimetype='text/xml')
+    g = resp.gather(input='speech',
+                    action=f"/webhook/onboarding-answer?business_id={biz_id}&onboarding_id={ob_id}&q=0",
+                    method='POST', timeout=8, speech_timeout='5', language='en-GB')
+    g.say(questions[0]['question'], voice='Polly.Amy', language='en-GB')
+    resp.say("I didn't hear a response. Let me move to the next question.", voice='Polly.Amy')
+    resp.redirect(f"/webhook/onboarding-next?business_id={biz_id}&onboarding_id={ob_id}&q=1")
+    return Response(str(resp), mimetype='text/xml')
 
 
 @app.route('/webhook/onboarding-answer', methods=['POST', 'GET'])
