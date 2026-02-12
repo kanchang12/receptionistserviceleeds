@@ -11,25 +11,29 @@
 <div class="card" style="margin-bottom:24px;">
     <div class="card-body" style="text-align:center;padding:48px;">
         <h3 style="margin-bottom:12px;">Complete Your Setup</h3>
-        <p style="color:var(--text-secondary);margin-bottom:24px;">Your AI receptionist needs to be configured. Start the onboarding interview to get set up.</p>
+        <p style="color:var(--text-secondary);margin-bottom:24px;">Start the onboarding interview to configure your AI receptionist.</p>
         <a href="{{ url_for('client_onboarding') }}" class="btn btn-primary">Start Onboarding</a>
     </div>
 </div>
 {% endif %}
 
+<!-- STATS ROW -->
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-label">Today's Calls</div>
         <div class="stat-value accent">{{ today_calls }}</div>
     </div>
     <div class="stat-card">
+        <div class="stat-label">Total Calls</div>
+        <div class="stat-value">{{ total_calls }}</div>
+    </div>
+    <div class="stat-card">
         <div class="stat-label">Active Now</div>
         <div class="stat-value green">{{ active_calls }}</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Minutes Used</div>
-        <div class="stat-value">{{ "%.0f"|format(usage.minutes_used|float) if usage else 0 }}</div>
-        <div class="stat-sub">of {{ usage.minutes_limit if usage else 200 }} this month</div>
+        <div class="stat-label">Avg Duration</div>
+        <div class="stat-value">{{ "%.1f"|format(avg_duration|float / 60) }}m</div>
     </div>
     <div class="stat-card">
         <div class="stat-label">Open Tickets</div>
@@ -37,6 +41,7 @@
     </div>
 </div>
 
+<!-- USAGE BAR -->
 {% if usage %}
 {% set pct = (usage.minutes_used|float / usage.minutes_limit * 100) if usage.minutes_limit > 0 else 0 %}
 <div class="usage-section">
@@ -50,16 +55,58 @@
 </div>
 {% endif %}
 
-{% if phone %}
+<!-- PHONE NUMBERS -->
+{% if phone_numbers %}
 <div class="card" style="margin-bottom:24px;">
-    <div class="card-body">
-        <div class="stat-label">Your Phone Number</div>
-        <div class="stat-value" style="font-family:var(--font-mono);font-size:1.4rem;">{{ phone.number }}</div>
-        <div class="stat-sub">Callers dial this number to reach your AI receptionist</div>
+    <div class="card-header"><h3>Your Numbers</h3></div>
+    <div class="card-body no-pad">
+        <table class="data-table">
+            <thead><tr><th>Number</th><th>Label</th><th>Status</th></tr></thead>
+            <tbody>
+            {% for p in phone_numbers %}
+            <tr>
+                <td style="font-family:var(--font-mono);font-size:1rem;font-weight:600;">{{ p.number }}</td>
+                <td>{{ p.label or '—' }}</td>
+                <td><span class="badge badge-green">{{ p.status }}</span></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 {% endif %}
 
+<!-- CHARTS ROW -->
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-bottom:24px;">
+    <div class="card">
+        <div class="card-header"><h3>Last 7 Days</h3></div>
+        <div class="card-body"><canvas id="dailyChart" height="200"></canvas></div>
+    </div>
+    <div class="card">
+        <div class="card-header"><h3>Call Categories</h3></div>
+        <div class="card-body"><canvas id="categoryChart" height="200"></canvas></div>
+    </div>
+    <div class="card">
+        <div class="card-header"><h3>Sentiment</h3></div>
+        <div class="card-body"><canvas id="sentimentChart" height="200"></canvas></div>
+    </div>
+</div>
+
+<!-- STATUS BREAKDOWN -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));gap:12px;margin-bottom:24px;">
+    {% for s in statuses %}
+    <div class="stat-card" style="text-align:center;">
+        <div class="stat-value" style="font-size:1.5rem;
+            {% if s.status == 'completed' %}color:var(--green);
+            {% elif s.status == 'in_progress' %}color:var(--orange);
+            {% elif s.status == 'missed' %}color:#ef4444;
+            {% else %}color:var(--text-primary);{% endif %}">{{ s.cnt }}</div>
+        <div class="stat-label">{{ s.status|replace('_',' ')|title }}</div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- CALLS + TICKETS -->
 <div class="two-col">
     <div class="card">
         <div class="card-header">
@@ -69,14 +116,16 @@
         <div class="card-body no-pad">
             {% if calls %}
             <table class="data-table">
-                <thead><tr><th>Caller</th><th>Category</th><th>Sentiment</th><th>Duration</th></tr></thead>
+                <thead><tr><th>Caller</th><th>Status</th><th>Category</th><th>Sentiment</th><th>Duration</th><th>Time</th></tr></thead>
                 <tbody>
-                {% for c in calls[:5] %}
+                {% for c in calls[:8] %}
                 <tr onclick="location.href='{{ url_for('client_call_detail', call_id=c.id) }}'" style="cursor:pointer;">
                     <td style="font-family:var(--font-mono);font-size:0.85rem;">{{ c.caller_number or 'Unknown' }}</td>
+                    <td><span class="badge badge-{% if c.status == 'completed' %}green{% elif c.status == 'in_progress' %}orange{% elif c.status == 'missed' %}red{% else %}neutral{% endif %}">{{ c.status|replace('_',' ') }}</span></td>
                     <td><span class="badge badge-neutral">{{ c.category or 'other' }}</span></td>
-                    <td><span class="badge badge-{{ c.sentiment or 'neutral' }}-s">{{ c.sentiment or 'neutral' }}</span></td>
+                    <td><span class="badge badge-{{ c.sentiment or 'neutral' }}-s">{{ c.sentiment or '—' }}</span></td>
                     <td>{{ ((c.duration_seconds or 0) / 60)|round(1) }}m</td>
+                    <td style="font-size:0.8rem;color:var(--text-muted);white-space:nowrap;">{{ c.created_at.strftime('%d %b %H:%M') if c.created_at else '-' }}</td>
                 </tr>
                 {% endfor %}
                 </tbody>
@@ -112,4 +161,58 @@
         </div>
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.font = { family: "'Inter', system-ui, sans-serif", size: 11 };
+const gridColor = 'rgba(255,255,255,0.06)';
+
+// Daily calls
+new Chart(document.getElementById('dailyChart'), {
+    type: 'bar',
+    data: {
+        labels: [{% for d in daily_calls %}'{{ d.day.strftime("%d %b") }}'{% if not loop.last %},{% endif %}{% endfor %}],
+        datasets: [{
+            label: 'Calls',
+            data: [{% for d in daily_calls %}{{ d.cnt }}{% if not loop.last %},{% endif %}{% endfor %}],
+            backgroundColor: '#6366f1',
+            borderRadius: 4,
+            borderSkipped: false
+        }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: gridColor } }, x: { grid: { display: false } } }
+    }
+});
+
+// Categories
+const catColors = ['#6366f1','#22c55e','#f59e0b','#ef4444','#06b6d4','#8b5cf6','#ec4899','#64748b'];
+new Chart(document.getElementById('categoryChart'), {
+    type: 'doughnut',
+    data: {
+        labels: [{% for c in categories %}'{{ c.category or "other" }}'{% if not loop.last %},{% endif %}{% endfor %}],
+        datasets: [{ data: [{% for c in categories %}{{ c.cnt }}{% if not loop.last %},{% endif %}{% endfor %}],
+            backgroundColor: catColors.slice(0, {{ categories|length }}), borderWidth: 0 }]
+    },
+    options: { responsive: true, cutout: '60%',
+        plugins: { legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, pointStyle: 'circle' } } }
+    }
+});
+
+// Sentiment
+const sentColors = { positive: '#22c55e', neutral: '#64748b', negative: '#ef4444', mixed: '#f59e0b' };
+const sentLabels = [{% for s in sentiments %}'{{ s.sentiment or "neutral" }}'{% if not loop.last %},{% endif %}{% endfor %}];
+new Chart(document.getElementById('sentimentChart'), {
+    type: 'doughnut',
+    data: {
+        labels: sentLabels,
+        datasets: [{ data: [{% for s in sentiments %}{{ s.cnt }}{% if not loop.last %},{% endif %}{% endfor %}],
+            backgroundColor: sentLabels.map(l => sentColors[l] || '#64748b'), borderWidth: 0 }]
+    },
+    options: { responsive: true, cutout: '60%',
+        plugins: { legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, pointStyle: 'circle' } } }
+    }
+});
+</script>
 {% endblock %}
