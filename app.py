@@ -171,9 +171,11 @@ def get_business_for_user(user_id):
 
 
 def get_business_by_number(phone_number):
-    """Look up which business owns this phone number."""
+    """Look up which business owns this phone number + number-specific config."""
     return query_db("""
-        SELECT b.* FROM businesses b
+        SELECT b.*, p.greeting as number_greeting, p.agent_personality as number_personality,
+               p.label as number_label, p.id as phone_number_id
+        FROM businesses b
         JOIN phone_numbers p ON p.business_id = b.id
         WHERE p.number = %s AND p.status = 'assigned'
         LIMIT 1
@@ -611,6 +613,11 @@ def admin_dashboard():
         ORDER BY oc.created_at DESC LIMIT 20
     """)
     all_users = query_db("SELECT * FROM users ORDER BY created_at DESC LIMIT 50")
+    phone_numbers = query_db("""
+        SELECT p.*, b.name as business_name FROM phone_numbers p
+        LEFT JOIN businesses b ON p.business_id=b.id ORDER BY p.created_at DESC
+    """)
+    businesses = query_db("SELECT id, name FROM businesses ORDER BY name")
 
     return render_template('admin/dashboard.html',
                            total_clients=total_clients['cnt'] if total_clients else 0,
@@ -618,20 +625,8 @@ def admin_dashboard():
                            active_count=active['cnt'] if active else 0,
                            today_calls=today_calls['cnt'] if today_calls else 0,
                            recent_calls=recent_calls, pending_clients=pending_clients,
-                           onboarding_calls=onboarding_calls, all_users=all_users)
-
-
-@app.route('/admin/clients')
-@login_required
-@admin_required
-def admin_clients():
-    clients = query_db("""
-        SELECT u.*, b.name as business_name, b.tier, b.status as biz_status, b.id as biz_id,
-               (SELECT COUNT(*) FROM calls WHERE business_id=b.id) as total_calls
-        FROM users u LEFT JOIN businesses b ON b.user_id=u.id
-        WHERE u.role='client' ORDER BY u.created_at DESC
-    """)
-    return render_template('admin/clients.html', clients=clients)
+                           onboarding_calls=onboarding_calls, all_users=all_users,
+                           phone_numbers=phone_numbers, businesses=businesses)
 
 
 @app.route('/admin/clients/<user_id>/activate', methods=['POST', 'GET'])
@@ -646,45 +641,43 @@ def admin_activate_client(user_id):
     return redirect(url_for('admin_dashboard'))
 
 
-@app.route('/admin/clients/create', methods=['GET', 'POST'])
+@app.route('/admin/clients/create', methods=['POST'])
 @login_required
 @admin_required
 def admin_create_client():
-    if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        email = request.form.get('email', '').strip().lower()
-        phone = request.form.get('phone', '').strip()
-        password = request.form.get('password', '').strip()
-        business_name = request.form.get('business_name', '').strip()
-        business_type = request.form.get('business_type', '').strip()
-        tier = request.form.get('tier', 'starter')
-        status = request.form.get('status', 'active')
+    name = request.form.get('name', '').strip()
+    email = request.form.get('email', '').strip().lower()
+    phone = request.form.get('phone', '').strip()
+    password = request.form.get('password', '').strip()
+    business_name = request.form.get('business_name', '').strip()
+    business_type = request.form.get('business_type', '').strip()
+    tier = request.form.get('tier', 'starter')
+    status = request.form.get('status', 'active')
 
-        if not all([name, email, password, business_name]):
-            flash('Name, email, password and business name are required.', 'error')
-            return render_template('admin/create_client.html')
+    if not all([name, email, password, business_name]):
+        flash('Name, email, password and business name are required.', 'error')
+        return redirect(url_for('admin_dashboard'))
 
-        existing = query_db("SELECT id FROM users WHERE email=%s", (email,), one=True)
-        if existing:
-            flash('Email already registered.', 'error')
-            return render_template('admin/create_client.html')
+    existing = query_db("SELECT id FROM users WHERE email=%s", (email,), one=True)
+    if existing:
+        flash('Email already registered.', 'error')
+        return redirect(url_for('admin_dashboard'))
 
-        pw_hash = generate_password_hash(password)
-        user_id = insert_db(
-            "INSERT INTO users (name, email, phone, password_hash, role, status) VALUES (%s,%s,%s,%s,'client',%s) RETURNING id",
-            (name, email, phone, pw_hash, status))
+    pw_hash = generate_password_hash(password)
+    user_id = insert_db(
+        "INSERT INTO users (name, email, phone, password_hash, role, status) VALUES (%s,%s,%s,%s,'client',%s) RETURNING id",
+        (name, email, phone, pw_hash, status))
 
-        if user_id:
-            greeting = request.form.get('greeting', '').strip()
-            agent_personality = request.form.get('agent_personality', '').strip()
-            biz_id = insert_db(
-                "INSERT INTO businesses (user_id, name, business_type, status, tier, greeting, agent_personality) VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id",
-                (user_id, business_name, business_type, status, tier, greeting, agent_personality))
-            flash(f'Client {name} created successfully.', 'success')
-            return redirect(url_for('admin_dashboard'))
-
+    if user_id:
+        greeting = request.form.get('greeting', '').strip()
+        agent_personality = request.form.get('agent_personality', '').strip()
+        insert_db(
+            "INSERT INTO businesses (user_id, name, business_type, status, tier, greeting, agent_personality) VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            (user_id, business_name, business_type, status, tier, greeting, agent_personality))
+        flash(f'Client {name} created.', 'success')
+    else:
         flash('Failed to create client.', 'error')
-    return render_template('admin/create_client.html')
+    return redirect(url_for('admin_dashboard'))
 
 
 @app.route('/admin/clients/<user_id>/suspend', methods=['POST', 'GET'])
@@ -693,59 +686,47 @@ def admin_create_client():
 def admin_suspend_client(user_id):
     execute_db("UPDATE users SET status='suspended' WHERE id=%s", (user_id,))
     flash('Client suspended.', 'success')
-    return redirect(url_for('admin_clients'))
+    return redirect(url_for('admin_dashboard'))
 
 
-@app.route('/admin/numbers')
+@app.route('/admin/numbers/add', methods=['POST'])
 @login_required
 @admin_required
-def admin_numbers():
-    numbers = query_db("""
-        SELECT p.*, b.name as business_name FROM phone_numbers p
-        LEFT JOIN businesses b ON p.business_id=b.id ORDER BY p.created_at DESC
-    """)
-    businesses = query_db("SELECT id, name FROM businesses ORDER BY name")
-    return render_template('admin/numbers.html', numbers=numbers, businesses=businesses)
+def admin_add_number():
+    number = request.form.get('number', '').strip()
+    label = request.form.get('label', '').strip()
+    business_id = request.form.get('business_id', '').strip() or None
+    greeting = request.form.get('greeting', '').strip()
+    agent_personality = request.form.get('agent_personality', '').strip()
+    status = 'assigned' if business_id else 'available'
+
+    if not number:
+        flash('Phone number is required.', 'error')
+        return redirect(url_for('admin_dashboard'))
+
+    existing = query_db("SELECT id FROM phone_numbers WHERE number=%s", (number,), one=True)
+    if existing:
+        flash('Number already exists.', 'error')
+        return redirect(url_for('admin_dashboard'))
+
+    insert_db(
+        "INSERT INTO phone_numbers (number, label, business_id, greeting, agent_personality, status) VALUES (%s,%s,%s,%s,%s,%s) RETURNING id",
+        (number, label, business_id, greeting, agent_personality, status))
+    flash(f'Number {number} added.', 'success')
+    return redirect(url_for('admin_dashboard'))
 
 
-@app.route('/admin/numbers/search', methods=['POST', 'GET'])
+@app.route('/admin/numbers/<number_id>/delete', methods=['POST'])
 @login_required
 @admin_required
-def admin_search_numbers():
-    country = request.form.get('country', 'GB')
-    numbers = twilio_service.search_numbers(country=country)
-    flash(f'Found {len(numbers)} available numbers.', 'info')
-    return render_template('admin/numbers.html',
-                           numbers=query_db("SELECT p.*, b.name as business_name FROM phone_numbers p LEFT JOIN businesses b ON p.business_id=b.id ORDER BY p.created_at DESC"),
-                           available=numbers,
-                           businesses=query_db("SELECT id, name FROM businesses ORDER BY name"))
+def admin_delete_number(number_id):
+    num = query_db("SELECT * FROM phone_numbers WHERE id=%s", (number_id,), one=True)
+    if num and num.get('twilio_sid'):
+        twilio_service.release_number(num['twilio_sid'])
+    execute_db("DELETE FROM phone_numbers WHERE id=%s", (number_id,))
+    flash('Number deleted.', 'success')
+    return redirect(url_for('admin_dashboard'))
 
-
-@app.route('/admin/numbers/buy', methods=['POST', 'GET'])
-@login_required
-@admin_required
-def admin_buy_number():
-    number = request.form.get('number')
-    result = twilio_service.buy_number(number, 'pool')
-    if result:
-        execute_db("INSERT INTO phone_numbers (number, twilio_sid, status) VALUES (%s,%s,'available')",
-                   (result['number'], result['sid']))
-        flash(f'Purchased {result["number"]}.', 'success')
-    else:
-        flash('Failed to purchase number.', 'error')
-    return redirect(url_for('admin_numbers'))
-
-
-@app.route('/admin/numbers/assign', methods=['POST', 'GET'])
-@login_required
-@admin_required
-def admin_assign_number():
-    number_id = request.form.get('number_id')
-    business_id = request.form.get('business_id')
-    execute_db("UPDATE phone_numbers SET business_id=%s, status='assigned' WHERE id=%s",
-               (business_id, number_id))
-    flash('Number assigned.', 'success')
-    return redirect(url_for('admin_numbers'))
 
 
 # ───────────────────────────────────────────
@@ -799,8 +780,12 @@ def webhook_incoming_call():
     # Initialize conversation log in cache
     cache_set(f"conv:{call_sid}", [], ex=1800)
 
-    # Greet and gather
-    greeting = biz.get('greeting') or f"Hello, thank you for calling {biz['name']}. How can I help you?"
+    # Store number-specific personality in cache for gather-response
+    number_personality = biz.get('number_personality') or biz.get('agent_personality') or ''
+    cache_set(f"num_personality:{call_sid}", number_personality, ex=1800)
+
+    # Greet and gather — prefer number-specific greeting
+    greeting = biz.get('number_greeting') or biz.get('greeting') or f"Hello, thank you for calling {biz['name']}. How can I help you?"
     return Response(
         twilio_service.twiml_greet_and_gather(greeting, biz_id, call_sid),
         mimetype='text/xml')
@@ -840,10 +825,17 @@ def webhook_gather_response():
     # Get knowledge base docs for context
     kb_docs = query_db("SELECT title, content FROM knowledge_base WHERE business_id=%s AND active=TRUE", (biz_id,))
 
-    # Build config for Gemini
+    # Build config for Gemini — prefer number-specific personality
+    num_personality = cache_get(f"num_personality:{call_sid}") or ''
+    if not num_personality:
+        # Fallback: look up from DB via call's called_number
+        call_row = query_db("SELECT called_number FROM calls WHERE twilio_call_sid=%s", (call_sid,), one=True)
+        if call_row and call_row['called_number']:
+            pn = query_db("SELECT agent_personality FROM phone_numbers WHERE number=%s", (call_row['called_number'],), one=True)
+            num_personality = (pn['agent_personality'] if pn and pn['agent_personality'] else '') or ''
     config = {
         'greeting': biz.get('greeting', ''),
-        'agent_personality': biz.get('agent_personality', ''),
+        'agent_personality': num_personality or biz.get('agent_personality', ''),
         'services': biz.get('config', {}).get('services', '') if isinstance(biz.get('config'), dict) else '',
         'business_hours': str(biz.get('business_hours', '')),
         'transfer_number': biz.get('transfer_number', ''),
@@ -1158,7 +1150,7 @@ def server_error(e):
 
 
 # ───────────────────────────────────────────
-# ENSURE ADMIN EXISTS ON STARTUP
+# STARTUP: ADMIN + MIGRATIONS
 # ───────────────────────────────────────────
 with app.app_context():
     try:
@@ -1174,6 +1166,14 @@ with app.app_context():
         print("✅ Admin user ready: kanchan.g12@gmail.com")
     except Exception as e:
         print(f"⚠️ Admin setup: {e}")
+
+    # Auto-migrate: add new columns if missing
+    for col, typ in [('label', "VARCHAR(100) DEFAULT ''"), ('greeting', "TEXT DEFAULT ''"), ('agent_personality', "TEXT DEFAULT ''")]:
+        try:
+            execute_db(f"ALTER TABLE phone_numbers ADD COLUMN {col} {typ}")
+            print(f"✅ Added phone_numbers.{col}")
+        except Exception:
+            pass  # column already exists
 
 # ───────────────────────────────────────────
 
