@@ -594,7 +594,7 @@ def client_start_onboarding():
 def admin_dashboard():
     total_clients = query_db("SELECT COUNT(*) as cnt FROM users WHERE role='client'", one=True)
     pending = query_db("SELECT COUNT(*) as cnt FROM users WHERE status='ready_for_review'", one=True)
-    active = query_db("SELECT COUNT(*) as cnt FROM users WHERE status='active'", one=True)
+    active = query_db("SELECT COUNT(*) as cnt FROM users WHERE status='active' AND role='client'", one=True)
     today = datetime.now().date()
     today_calls = query_db("SELECT COUNT(*) as cnt FROM calls WHERE created_at::date=%s", (today,), one=True)
     recent_calls = query_db("SELECT c.*, b.name as business_name FROM calls c JOIN businesses b ON c.business_id=b.id ORDER BY c.created_at DESC LIMIT 20")
@@ -603,13 +603,22 @@ def admin_dashboard():
         FROM users u JOIN businesses b ON b.user_id=u.id
         WHERE u.status IN ('pending', 'ready_for_review') ORDER BY u.created_at DESC
     """)
+    onboarding_calls = query_db("""
+        SELECT oc.*, b.name as business_name, u.name as user_name, u.email as user_email
+        FROM onboarding_calls oc
+        LEFT JOIN businesses b ON oc.business_id=b.id
+        LEFT JOIN users u ON b.user_id=u.id
+        ORDER BY oc.created_at DESC LIMIT 20
+    """)
+    all_users = query_db("SELECT * FROM users ORDER BY created_at DESC LIMIT 50")
 
     return render_template('admin/dashboard.html',
                            total_clients=total_clients['cnt'] if total_clients else 0,
                            pending_count=pending['cnt'] if pending else 0,
                            active_count=active['cnt'] if active else 0,
                            today_calls=today_calls['cnt'] if today_calls else 0,
-                           recent_calls=recent_calls, pending_clients=pending_clients)
+                           recent_calls=recent_calls, pending_clients=pending_clients,
+                           onboarding_calls=onboarding_calls, all_users=all_users)
 
 
 @app.route('/admin/clients')
@@ -1104,6 +1113,24 @@ def not_found(e):
 def server_error(e):
     return render_template('public/error.html', code=500, msg='Something went wrong.'), 500
 
+
+# ───────────────────────────────────────────
+# ENSURE ADMIN EXISTS ON STARTUP
+# ───────────────────────────────────────────
+with app.app_context():
+    try:
+        admin = query_db("SELECT id FROM users WHERE email=%s", ('kanchan.g12@gmail.com',), one=True)
+        if admin:
+            execute_db("UPDATE users SET role='admin', status='active' WHERE email=%s", ('kanchan.g12@gmail.com',))
+        else:
+            from werkzeug.security import generate_password_hash
+            execute_db(
+                "INSERT INTO users (name, email, password_hash, role, status) VALUES (%s,%s,%s,'admin','active')",
+                ('Kanchan', 'kanchan.g12@gmail.com', generate_password_hash('admin@123'))
+            )
+        print("✅ Admin user ready: kanchan.g12@gmail.com")
+    except Exception as e:
+        print(f"⚠️ Admin setup: {e}")
 
 # ───────────────────────────────────────────
 
