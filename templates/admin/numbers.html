@@ -1,0 +1,79 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Numbers — VoiceBot Admin{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Phone Numbers</h1>
+    <p>Purchase and assign Twilio numbers</p>
+</div>
+
+<!-- Search available numbers -->
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header"><h3>Search Available Numbers</h3></div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('admin_search_numbers') }}" class="form-inline">
+            <select name="country" class="form-select" style="width:auto;">
+                <option value="GB">United Kingdom (+44)</option>
+                <option value="US">United States (+1)</option>
+                <option value="AU">Australia (+61)</option>
+            </select>
+            <button type="submit" class="btn btn-primary">Search Numbers</button>
+        </form>
+
+        {% if available is defined and available %}
+        <div style="margin-top:20px;">
+            <table class="data-table">
+                <thead><tr><th>Number</th><th>Location</th><th>Action</th></tr></thead>
+                <tbody>
+                {% for n in available %}
+                <tr>
+                    <td style="font-family:var(--font-mono);">{{ n.number }}</td>
+                    <td>{{ n.locality }} {{ n.region }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('admin_buy_number') }}">
+                            <input type="hidden" name="number" value="{{ n.number }}">
+                            <button class="btn btn-sm btn-primary">Buy</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Owned numbers -->
+<div class="card">
+    <div class="card-header"><h3>Owned Numbers</h3></div>
+    <div class="card-body no-pad">
+        {% if numbers %}
+        <table class="data-table">
+            <thead><tr><th>Number</th><th>Business</th><th>Status</th><th>Assign</th></tr></thead>
+            <tbody>
+            {% for n in numbers %}
+            <tr>
+                <td style="font-family:var(--font-mono);">{{ n.number }}</td>
+                <td>{{ n.business_name or '—' }}</td>
+                <td><span class="badge badge-{{ 'green' if n.status == 'assigned' else 'orange' }}">{{ n.status }}</span></td>
+                <td>
+                    {% if n.status == 'available' %}
+                    <form method="POST" action="{{ url_for('admin_assign_number') }}" class="form-inline">
+                        <input type="hidden" name="number_id" value="{{ n.id }}">
+                        <input type="text" name="business_id" class="form-input" style="width:240px;" placeholder="Business ID">
+                        <button class="btn btn-sm btn-secondary">Assign</button>
+                    </form>
+                    {% else %}
+                    Assigned
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state"><h3>No numbers purchased</h3><p>Search and buy numbers above.</p></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

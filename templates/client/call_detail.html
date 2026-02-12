@@ -1,0 +1,88 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Call Detail — VoiceBot{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Call from {{ call.caller_number or 'Unknown' }}</h1>
+    <p>{{ call.created_at.strftime('%d %B %Y at %H:%M') if call.created_at else '' }} · {{ ((call.duration_seconds or 0) / 60)|round(1) }} minutes</p>
+</div>
+
+<div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
+    <div class="stat-card">
+        <div class="stat-label">Category</div>
+        <div class="stat-value" style="font-size:1.2rem;"><span class="badge badge-neutral">{{ call.category or 'other' }}</span></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Sentiment</div>
+        <div class="stat-value" style="font-size:1.2rem;"><span class="badge badge-{{ call.sentiment or 'neutral' }}-s">{{ call.sentiment or 'neutral' }}</span></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Resolution</div>
+        <div class="stat-value" style="font-size:1.2rem;">{{ call.resolution or 'unknown' }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Status</div>
+        <div class="stat-value" style="font-size:1.2rem;"><span class="badge badge-{{ call.status }}">{{ call.status }}</span></div>
+    </div>
+</div>
+
+{% if call.summary %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header"><h3>AI Summary</h3></div>
+    <div class="card-body"><p>{{ call.summary }}</p></div>
+</div>
+{% endif %}
+
+{% if call.caller_intent %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header"><h3>Caller Intent</h3></div>
+    <div class="card-body"><p>{{ call.caller_intent }}</p></div>
+</div>
+{% endif %}
+
+{% if call.recording_url %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header"><h3>Recording</h3></div>
+    <div class="card-body">
+        <audio controls class="audio-player"><source src="{{ call.recording_url }}" type="audio/mpeg">Your browser does not support audio.</audio>
+    </div>
+</div>
+{% endif %}
+
+{% if call.transcript %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header"><h3>Transcript</h3></div>
+    <div class="card-body"><div class="transcript">{{ call.transcript }}</div></div>
+</div>
+{% endif %}
+
+{% if call.action_items and call.action_items != '[]' %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header"><h3>Action Items</h3></div>
+    <div class="card-body">
+        {% set items = call.action_items if call.action_items is iterable and call.action_items is not string else [] %}
+        {% for item in items %}
+        <p style="padding:4px 0;">• {{ item }}</p>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if ticket %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header">
+        <h3>Linked Ticket</h3>
+        <span class="badge badge-{{ ticket.status }}">{{ ticket.status }}</span>
+    </div>
+    <div class="card-body">
+        <p><strong>{{ ticket.subject or 'No subject' }}</strong></p>
+        <p style="color:var(--text-secondary);margin-top:8px;">{{ ticket.description or '' }}</p>
+        <div style="margin-top:12px;">
+            <span class="badge badge-neutral">{{ ticket.type }}</span>
+            <span class="badge badge-{{ ticket.priority }}">{{ ticket.priority }}</span>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<a href="{{ url_for('client_calls') }}" class="btn btn-secondary">← Back to Calls</a>
+{% endblock %}

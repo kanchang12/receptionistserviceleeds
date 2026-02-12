@@ -1,0 +1,123 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Settings — VoiceBot{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Agent Settings</h1>
+    <p>Configure how your AI receptionist behaves</p>
+</div>
+
+<form method="POST">
+    <div class="two-col">
+        <div>
+            <div class="card" style="margin-bottom:24px;">
+                <div class="card-header"><h3>Greeting & Personality</h3></div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label class="form-label">Greeting Message</label>
+                        <textarea name="greeting" class="form-textarea" placeholder="Hello, thank you for calling...">{{ business.greeting or '' }}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Agent Personality</label>
+                        <textarea name="agent_personality" class="form-textarea" style="min-height:140px;" placeholder="Describe how the AI should behave, its tone, what it knows...">{{ business.agent_personality or '' }}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">After Hours Message</label>
+                        <textarea name="after_hours_message" class="form-textarea" placeholder="We are currently closed...">{{ business.after_hours_message or '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom:24px;">
+                <div class="card-header"><h3>Call Routing</h3></div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label class="form-label">Transfer Number</label>
+                        <input type="tel" name="transfer_number" class="form-input" value="{{ business.transfer_number or '' }}" placeholder="+44 7700 900000">
+                        <div class="stat-sub" style="margin-top:4px;">Calls transfer here when the AI can't help or caller requests a human</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Restricted Information</label>
+                        <textarea name="restricted_info" class="form-textarea" placeholder="Information the AI must never share with callers...">{{ business.restricted_info or '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <div class="card" style="margin-bottom:24px;">
+                <div class="card-header"><h3>Business Hours</h3></div>
+                <div class="card-body">
+                    {% set hours = business.business_hours if business.business_hours and business.business_hours is mapping else {} %}
+                    <div class="hours-grid">
+                        {% for day in ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] %}
+                        {% set day_data = hours.get(day, {}) %}
+                        <div class="hours-row">
+                            <label>{{ day }}</label>
+                            <div class="hours-inputs">
+                                <input type="time" name="{{ day }}_open" value="{{ day_data.get('open', '09:00') if not day_data.get('closed') else '09:00' }}">
+                                <span style="color:var(--text-muted);">to</span>
+                                <input type="time" name="{{ day }}_close" value="{{ day_data.get('close', '17:00') if not day_data.get('closed') else '17:00' }}">
+                                <label class="form-check" style="margin-left:8px;">
+                                    <input type="checkbox" name="{{ day }}_closed" {% if day_data.get('closed') %}checked{% endif %}>
+                                    <span style="font-size:0.8rem;color:var(--text-muted);">Closed</span>
+                                </label>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary" style="margin-bottom:32px;">Save Settings</button>
+</form>
+
+<!-- Knowledge Base -->
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header"><h3>Knowledge Base</h3></div>
+    <div class="card-body">
+        <p style="color:var(--text-secondary);margin-bottom:20px;">Add FAQs, policies, and documents that your AI receptionist can reference during calls.</p>
+
+        {% if knowledge_base %}
+        <div class="kb-list" style="margin-bottom:24px;">
+            {% for kb in knowledge_base %}
+            <div class="kb-item">
+                <div class="kb-item-content">
+                    <div class="kb-item-title">{{ kb.title }} <span class="badge badge-neutral" style="margin-left:8px;">{{ kb.doc_type }}</span></div>
+                    <div class="kb-item-text">{{ kb.content[:200] }}{% if kb.content|length > 200 %}...{% endif %}</div>
+                </div>
+                <form method="POST" action="{{ url_for('client_delete_kb', kb_id=kb.id) }}">
+                    <button type="submit" class="btn btn-sm btn-danger">Remove</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('client_add_kb') }}" style="border-top:1px solid var(--border);padding-top:20px;">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Title</label>
+                    <input type="text" name="title" class="form-input" required placeholder="e.g. Pricing Policy">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <select name="doc_type" class="form-select">
+                        <option value="faq">FAQ</option>
+                        <option value="policy">Policy</option>
+                        <option value="script">Script</option>
+                        <option value="document">Document</option>
+                        <option value="note">Note</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Content</label>
+                <textarea name="content" class="form-textarea" required placeholder="The information your AI should know..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-secondary">Add Entry</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

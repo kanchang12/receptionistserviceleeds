@@ -1,0 +1,1095 @@
+"""
+VoiceBot SaaS Platform
+Twilio telephony + Gemini AI backbone
+Flask + PostgreSQL + Redis + Gunicorn
+"""
+
+import os
+import json
+import math
+import redis
+import psycopg2
+import psycopg2.extras
+from datetime import datetime, timedelta
+from functools import wraps
+from flask import (Flask, render_template, request, redirect, url_for,
+                   session, flash, jsonify, Response, abort)
+from werkzeug.security import generate_password_hash, check_password_hash
+
+from utils import gemini_service, twilio_service
+
+# ─── APP CONFIG ────────────────────────────
+
+app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'change-me-in-production')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=12)
+
+# ─── DATABASE ──────────────────────────────
+
+DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://localhost/voicebot')
+
+
+def get_db():
+    conn = psycopg2.connect(DATABASE_URL)
+    conn.autocommit = True
+    return conn
+
+
+def query_db(sql, params=None, one=False, commit=False):
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cur.execute(sql, params)
+        if commit:
+            conn.commit()
+            return cur.rowcount
+        if one:
+            return cur.fetchone()
+        return cur.fetchall()
+    except Exception as e:
+        print(f"[DB Error] {e}")
+        conn.rollback()
+        return None if one else []
+    finally:
+        cur.close()
+        conn.close()
+
+
+def execute_db(sql, params=None):
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute(sql, params)
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"[DB Error] {e}")
+        conn.rollback()
+        return False
+    finally:
+        cur.close()
+        conn.close()
+
+
+def insert_db(sql, params=None):
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute(sql, params)
+        conn.commit()
+        row_id = cur.fetchone()[0] if cur.description else None
+        return row_id
+    except Exception as e:
+        print(f"[DB Error] {e}")
+        conn.rollback()
+        return None
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ─── REDIS ─────────────────────────────────
+
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+try:
+    rds = redis.from_url(REDIS_URL, decode_responses=True)
+    rds.ping()
+except Exception:
+    rds = None
+    print("[WARN] Redis not available, using in-memory fallback")
+
+_mem_store = {}
+
+
+def cache_set(key, value, ex=3600):
+    if rds:
+        rds.set(key, json.dumps(value) if isinstance(value, (dict, list)) else str(value), ex=ex)
+    else:
+        _mem_store[key] = value
+
+
+def cache_get(key, as_json=False):
+    if rds:
+        val = rds.get(key)
+        if val and as_json:
+            return json.loads(val)
+        return val
+    return _mem_store.get(key)
+
+
+def cache_incr(key):
+    if rds:
+        return rds.incr(key)
+    _mem_store[key] = _mem_store.get(key, 0) + 1
+    return _mem_store[key]
+
+
+def cache_decr(key):
+    if rds:
+        return rds.decr(key)
+    _mem_store[key] = max(0, _mem_store.get(key, 0) - 1)
+    return _mem_store[key]
+
+
+# ─── AUTH DECORATORS ───────────────────────
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Please log in.', 'error')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated
+
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session or session.get('role') != 'admin':
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+
+
+def client_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session or session.get('role') != 'client':
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+
+
+# ─── HELPERS ───────────────────────────────
+
+TIER_LIMITS = {
+    'starter': {'minutes': 200, 'numbers': 1, 'price': 29},
+    'growth': {'minutes': 600, 'numbers': 2, 'price': 79},
+    'enterprise': {'minutes': 2000, 'numbers': 5, 'price': 199},
+}
+
+
+def get_business_for_user(user_id):
+    return query_db("SELECT * FROM businesses WHERE user_id=%s LIMIT 1", (user_id,), one=True)
+
+
+def get_business_by_number(phone_number):
+    """Look up which business owns this phone number."""
+    return query_db("""
+        SELECT b.* FROM businesses b
+        JOIN phone_numbers p ON p.business_id = b.id
+        WHERE p.number = %s AND p.status = 'assigned'
+        LIMIT 1
+    """, (phone_number,), one=True)
+
+
+def get_caller_history(business_id, caller_number, limit=2):
+    """Get last N calls from this caller to this business — for AI context."""
+    rows = query_db("""
+        SELECT summary, category, sentiment, created_at, duration_seconds
+        FROM calls
+        WHERE business_id = %s AND caller_number = %s AND status = 'completed'
+        ORDER BY created_at DESC LIMIT %s
+    """, (business_id, caller_number, limit))
+    if not rows:
+        return None
+    return [{'date': str(r['created_at']), 'summary': r['summary'],
+             'category': r['category'], 'sentiment': r['sentiment'],
+             'duration': r['duration_seconds']} for r in rows]
+
+
+def get_current_month():
+    return datetime.now().strftime('%Y-%m')
+
+
+def get_or_create_usage(business_id):
+    month = get_current_month()
+    row = query_db("SELECT * FROM minutes_usage WHERE business_id=%s AND month=%s",
+                   (business_id, month), one=True)
+    if not row:
+        biz = query_db("SELECT tier FROM businesses WHERE id=%s", (business_id,), one=True)
+        tier = biz['tier'] if biz else 'starter'
+        limit = TIER_LIMITS.get(tier, TIER_LIMITS['starter'])['minutes']
+        execute_db("INSERT INTO minutes_usage (business_id, month, minutes_limit) VALUES (%s,%s,%s)",
+                   (business_id, month, limit))
+        row = query_db("SELECT * FROM minutes_usage WHERE business_id=%s AND month=%s",
+                       (business_id, month), one=True)
+    return row
+
+
+def add_call_minutes(business_id, seconds):
+    """Add minutes to usage, check thresholds, send alerts."""
+    month = get_current_month()
+    minutes = round(seconds / 60, 2)
+    execute_db("UPDATE minutes_usage SET minutes_used = minutes_used + %s WHERE business_id=%s AND month=%s",
+               (minutes, business_id, month))
+    usage = get_or_create_usage(business_id)
+    if not usage:
+        return
+    pct = (float(usage['minutes_used']) / usage['minutes_limit'] * 100) if usage['minutes_limit'] > 0 else 0
+    biz = query_db("SELECT * FROM businesses WHERE id=%s", (business_id,), one=True)
+    user = query_db("SELECT * FROM users WHERE id=%s", (biz['user_id'],), one=True) if biz else None
+    if pct >= 100 and not usage['alert_100_sent']:
+        execute_db("UPDATE minutes_usage SET alert_100_sent=TRUE WHERE business_id=%s AND month=%s", (business_id, month))
+        if user and user['phone']:
+            twilio_service.send_sms(user['phone'], f"VoiceBot Alert: You've used 100% of your monthly minutes for {biz['name']}. Calls will use overage billing at £0.08/min.")
+    elif pct >= 90 and not usage['alert_90_sent']:
+        execute_db("UPDATE minutes_usage SET alert_90_sent=TRUE WHERE business_id=%s AND month=%s", (business_id, month))
+        if user and user['phone']:
+            twilio_service.send_sms(user['phone'], f"VoiceBot Alert: You've used 90% of your monthly minutes for {biz['name']}.")
+    elif pct >= 80 and not usage['alert_80_sent']:
+        execute_db("UPDATE minutes_usage SET alert_80_sent=TRUE WHERE business_id=%s AND month=%s", (business_id, month))
+        if user and user['phone']:
+            twilio_service.send_sms(user['phone'], f"VoiceBot Alert: You've used 80% of your monthly minutes for {biz['name']}.")
+
+
+def is_within_business_hours(business_hours):
+    """Check if current time is within business hours config."""
+    if not business_hours:
+        return True  # no hours set = always open
+    if isinstance(business_hours, str):
+        try:
+            business_hours = json.loads(business_hours)
+        except Exception:
+            return True
+    now = datetime.now()
+    day_name = now.strftime('%A').lower()
+    today_hours = business_hours.get(day_name)
+    if not today_hours or today_hours.get('closed'):
+        return False
+    try:
+        open_time = datetime.strptime(today_hours.get('open', '09:00'), '%H:%M').time()
+        close_time = datetime.strptime(today_hours.get('close', '17:00'), '%H:%M').time()
+        return open_time <= now.time() <= close_time
+    except Exception:
+        return True
+
+
+# ───────────────────────────────────────────
+# PUBLIC ROUTES
+# ───────────────────────────────────────────
+
+@app.route('/')
+def landing():
+    return render_template('public/landing.html')
+
+
+@app.route('/pricing')
+def pricing():
+    return render_template('public/landing.html', _anchor='pricing')
+
+
+# ───────────────────────────────────────────
+# AUTH ROUTES
+# ───────────────────────────────────────────
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip().lower()
+        phone = request.form.get('phone', '').strip()
+        password = request.form.get('password', '')
+        business_name = request.form.get('business_name', '').strip()
+        business_type = request.form.get('business_type', '').strip()
+
+        if not all([name, email, password, business_name]):
+            flash('All fields are required.', 'error')
+            return render_template('auth/register.html')
+
+        existing = query_db("SELECT id FROM users WHERE email=%s", (email,), one=True)
+        if existing:
+            flash('Email already registered.', 'error')
+            return render_template('auth/register.html')
+
+        pw_hash = generate_password_hash(password)
+        user_id = insert_db(
+            "INSERT INTO users (name, email, phone, password_hash, role, status) VALUES (%s,%s,%s,%s,'client','pending') RETURNING id",
+            (name, email, phone, pw_hash))
+
+        if user_id:
+            biz_id = insert_db(
+                "INSERT INTO businesses (user_id, name, business_type, status, tier) VALUES (%s,%s,%s,'pending','starter') RETURNING id",
+                (user_id, business_name, business_type))
+
+            session['user_id'] = str(user_id)
+            session['role'] = 'client'
+            session['business_id'] = str(biz_id) if biz_id else None
+            session.permanent = True
+
+            flash('Account created! Complete your onboarding to set up your AI receptionist.', 'success')
+            return redirect(url_for('client_dashboard'))
+
+        flash('Registration failed. Try again.', 'error')
+    return render_template('auth/register.html')
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+
+        user = query_db("SELECT * FROM users WHERE email=%s", (email,), one=True)
+        if user and check_password_hash(user['password_hash'], password):
+            session['user_id'] = str(user['id'])
+            session['role'] = user['role']
+            session.permanent = True
+
+            if user['role'] == 'admin':
+                return redirect(url_for('admin_dashboard'))
+
+            biz = get_business_for_user(user['id'])
+            if biz:
+                session['business_id'] = str(biz['id'])
+            return redirect(url_for('client_dashboard'))
+
+        flash('Invalid email or password.', 'error')
+    return render_template('auth/login.html')
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('Logged out.', 'success')
+    return redirect(url_for('landing'))
+
+
+# ───────────────────────────────────────────
+# CLIENT DASHBOARD
+# ───────────────────────────────────────────
+
+@app.route('/dashboard')
+@login_required
+@client_required
+def client_dashboard():
+    biz_id = session.get('business_id')
+    biz = query_db("SELECT * FROM businesses WHERE id=%s", (biz_id,), one=True)
+    if not biz:
+        flash('No business found.', 'error')
+        return redirect(url_for('landing'))
+
+    usage = get_or_create_usage(biz_id)
+    recent_calls = query_db(
+        "SELECT * FROM calls WHERE business_id=%s ORDER BY created_at DESC LIMIT 10", (biz_id,))
+    open_tickets = query_db(
+        "SELECT * FROM tickets WHERE business_id=%s AND status IN ('open','in_progress') ORDER BY created_at DESC LIMIT 10", (biz_id,))
+    phone = query_db("SELECT * FROM phone_numbers WHERE business_id=%s AND status='assigned' LIMIT 1", (biz_id,), one=True)
+
+    # Stats
+    today = datetime.now().date()
+    today_calls = query_db(
+        "SELECT COUNT(*) as cnt FROM calls WHERE business_id=%s AND created_at::date=%s",
+        (biz_id, today), one=True)
+    active_calls = int(cache_get(f"active_calls:{biz_id}") or 0)
+
+    return render_template('client/dashboard.html',
+                           business=biz, usage=usage, calls=recent_calls,
+                           tickets=open_tickets, phone=phone,
+                           today_calls=today_calls['cnt'] if today_calls else 0,
+                           active_calls=active_calls, tier_limits=TIER_LIMITS)
+
+
+@app.route('/dashboard/calls')
+@login_required
+@client_required
+def client_calls():
+    biz_id = session.get('business_id')
+    page = int(request.args.get('page', 1))
+    per_page = 20
+    offset = (page - 1) * per_page
+
+    total = query_db("SELECT COUNT(*) as cnt FROM calls WHERE business_id=%s", (biz_id,), one=True)
+    total_count = total['cnt'] if total else 0
+    total_pages = max(1, math.ceil(total_count / per_page))
+
+    calls = query_db(
+        "SELECT * FROM calls WHERE business_id=%s ORDER BY created_at DESC LIMIT %s OFFSET %s",
+        (biz_id, per_page, offset))
+
+    return render_template('client/calls.html', calls=calls,
+                           page=page, total_pages=total_pages, total_count=total_count)
+
+
+@app.route('/dashboard/calls/<call_id>')
+@login_required
+@client_required
+def client_call_detail(call_id):
+    biz_id = session.get('business_id')
+    call = query_db("SELECT * FROM calls WHERE id=%s AND business_id=%s",
+                    (call_id, biz_id), one=True)
+    if not call:
+        abort(404)
+    ticket = query_db("SELECT * FROM tickets WHERE call_id=%s", (call_id,), one=True)
+    return render_template('client/call_detail.html', call=call, ticket=ticket)
+
+
+@app.route('/dashboard/tickets')
+@login_required
+@client_required
+def client_tickets():
+    biz_id = session.get('business_id')
+    status_filter = request.args.get('status', 'all')
+    if status_filter != 'all':
+        tickets = query_db(
+            "SELECT t.*, c.caller_number as call_from FROM tickets t LEFT JOIN calls c ON t.call_id=c.id WHERE t.business_id=%s AND t.status=%s ORDER BY t.created_at DESC",
+            (biz_id, status_filter))
+    else:
+        tickets = query_db(
+            "SELECT t.*, c.caller_number as call_from FROM tickets t LEFT JOIN calls c ON t.call_id=c.id WHERE t.business_id=%s ORDER BY t.created_at DESC",
+            (biz_id,))
+    return render_template('client/tickets.html', tickets=tickets, status_filter=status_filter)
+
+
+@app.route('/dashboard/tickets/<ticket_id>/update', methods=['POST'])
+@login_required
+@client_required
+def client_update_ticket(ticket_id):
+    biz_id = session.get('business_id')
+    new_status = request.form.get('status')
+    notes = request.form.get('notes', '')
+    execute_db("UPDATE tickets SET status=%s, notes=%s, updated_at=NOW() WHERE id=%s AND business_id=%s",
+               (new_status, notes, ticket_id, biz_id))
+    flash('Ticket updated.', 'success')
+    return redirect(url_for('client_tickets'))
+
+
+@app.route('/dashboard/settings', methods=['GET', 'POST'])
+@login_required
+@client_required
+def client_settings():
+    biz_id = session.get('business_id')
+    biz = query_db("SELECT * FROM businesses WHERE id=%s", (biz_id,), one=True)
+
+    if request.method == 'POST':
+        greeting = request.form.get('greeting', '')
+        agent_personality = request.form.get('agent_personality', '')
+        after_hours = request.form.get('after_hours_message', '')
+        transfer_number = request.form.get('transfer_number', '')
+        restricted_info = request.form.get('restricted_info', '')
+
+        # Parse business hours from form
+        hours = {}
+        for day in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']:
+            if request.form.get(f'{day}_closed'):
+                hours[day] = {'closed': True}
+            else:
+                hours[day] = {
+                    'open': request.form.get(f'{day}_open', '09:00'),
+                    'close': request.form.get(f'{day}_close', '17:00')
+                }
+
+        execute_db("""UPDATE businesses SET greeting=%s, agent_personality=%s, after_hours_message=%s,
+                      transfer_number=%s, restricted_info=%s, business_hours=%s, updated_at=NOW()
+                      WHERE id=%s""",
+                   (greeting, agent_personality, after_hours, transfer_number,
+                    restricted_info, json.dumps(hours), biz_id))
+        flash('Settings saved.', 'success')
+        return redirect(url_for('client_settings'))
+
+    kb = query_db("SELECT * FROM knowledge_base WHERE business_id=%s AND active=TRUE ORDER BY created_at", (biz_id,))
+    return render_template('client/settings.html', business=biz, knowledge_base=kb)
+
+
+@app.route('/dashboard/knowledge-base/add', methods=['POST'])
+@login_required
+@client_required
+def client_add_kb():
+    biz_id = session.get('business_id')
+    title = request.form.get('title', '').strip()
+    content = request.form.get('content', '').strip()
+    doc_type = request.form.get('doc_type', 'faq')
+    if title and content:
+        execute_db("INSERT INTO knowledge_base (business_id, title, content, doc_type) VALUES (%s,%s,%s,%s)",
+                   (biz_id, title, content, doc_type))
+        flash('Knowledge base entry added.', 'success')
+    return redirect(url_for('client_settings'))
+
+
+@app.route('/dashboard/knowledge-base/<kb_id>/delete', methods=['POST'])
+@login_required
+@client_required
+def client_delete_kb(kb_id):
+    biz_id = session.get('business_id')
+    execute_db("UPDATE knowledge_base SET active=FALSE WHERE id=%s AND business_id=%s", (kb_id, biz_id))
+    flash('Entry removed.', 'success')
+    return redirect(url_for('client_settings'))
+
+
+@app.route('/dashboard/billing')
+@login_required
+@client_required
+def client_billing():
+    biz_id = session.get('business_id')
+    biz = query_db("SELECT * FROM businesses WHERE id=%s", (biz_id,), one=True)
+    usage = get_or_create_usage(biz_id)
+    invoices = query_db("SELECT * FROM invoices WHERE business_id=%s ORDER BY created_at DESC", (biz_id,))
+    return render_template('client/billing.html', business=biz, usage=usage,
+                           invoices=invoices, tier_limits=TIER_LIMITS)
+
+
+@app.route('/dashboard/onboarding')
+@login_required
+@client_required
+def client_onboarding():
+    biz_id = session.get('business_id')
+    biz = query_db("SELECT * FROM businesses WHERE id=%s", (biz_id,), one=True)
+    return render_template('client/onboarding.html', business=biz)
+
+
+@app.route('/dashboard/onboarding/start', methods=['POST'])
+@login_required
+@client_required
+def client_start_onboarding():
+    """Trigger outbound onboarding call to the business owner."""
+    biz_id = session.get('business_id')
+    biz = query_db("SELECT * FROM businesses WHERE id=%s", (biz_id,), one=True)
+    user = query_db("SELECT * FROM users WHERE id=%s", (session['user_id'],), one=True)
+
+    if not user or not user['phone']:
+        flash('Please add a phone number to your account first.', 'error')
+        return redirect(url_for('client_settings'))
+
+    # Generate questions
+    questions = gemini_service.get_onboarding_questions(biz['name'], biz['business_type'])
+
+    # Create onboarding record
+    ob_id = insert_db(
+        "INSERT INTO onboarding_calls (business_id, questions_asked, status) VALUES (%s,%s,'pending') RETURNING id",
+        (biz_id, json.dumps(questions)))
+
+    # Cache questions for webhook access
+    cache_set(f"onboarding_q:{ob_id}", questions, ex=3600)
+
+    # Make outbound call
+    try:
+        client = twilio_service.get_client()
+        from_number = os.environ.get('TWILIO_FROM_NUMBER', '')
+        call = client.calls.create(
+            to=user['phone'],
+            from_=from_number,
+            url=f"{os.environ.get('APP_BASE_URL')}/webhook/onboarding-start?business_id={biz_id}&onboarding_id={ob_id}",
+            method='POST',
+            record=True,
+            status_callback=f"{os.environ.get('APP_BASE_URL')}/webhook/onboarding-status?onboarding_id={ob_id}",
+        )
+        execute_db("UPDATE onboarding_calls SET twilio_call_sid=%s, status='in_progress' WHERE id=%s",
+                   (call.sid, ob_id))
+        execute_db("UPDATE users SET status='onboarding' WHERE id=%s", (session['user_id'],))
+        flash('Onboarding call initiated! Answer your phone.', 'success')
+    except Exception as e:
+        print(f"[Onboarding Call Error] {e}")
+        flash(f'Could not start call: {str(e)}', 'error')
+
+    return redirect(url_for('client_onboarding'))
+
+
+# ───────────────────────────────────────────
+# ADMIN DASHBOARD
+# ───────────────────────────────────────────
+
+@app.route('/admin')
+@login_required
+@admin_required
+def admin_dashboard():
+    total_clients = query_db("SELECT COUNT(*) as cnt FROM users WHERE role='client'", one=True)
+    pending = query_db("SELECT COUNT(*) as cnt FROM users WHERE status='ready_for_review'", one=True)
+    active = query_db("SELECT COUNT(*) as cnt FROM users WHERE status='active'", one=True)
+    today = datetime.now().date()
+    today_calls = query_db("SELECT COUNT(*) as cnt FROM calls WHERE created_at::date=%s", (today,), one=True)
+    recent_calls = query_db("SELECT c.*, b.name as business_name FROM calls c JOIN businesses b ON c.business_id=b.id ORDER BY c.created_at DESC LIMIT 20")
+    pending_clients = query_db("""
+        SELECT u.*, b.name as business_name, b.business_type, b.id as biz_id
+        FROM users u JOIN businesses b ON b.user_id=u.id
+        WHERE u.status IN ('pending', 'ready_for_review') ORDER BY u.created_at DESC
+    """)
+
+    return render_template('admin/dashboard.html',
+                           total_clients=total_clients['cnt'] if total_clients else 0,
+                           pending_count=pending['cnt'] if pending else 0,
+                           active_count=active['cnt'] if active else 0,
+                           today_calls=today_calls['cnt'] if today_calls else 0,
+                           recent_calls=recent_calls, pending_clients=pending_clients)
+
+
+@app.route('/admin/clients')
+@login_required
+@admin_required
+def admin_clients():
+    clients = query_db("""
+        SELECT u.*, b.name as business_name, b.tier, b.status as biz_status, b.id as biz_id,
+               (SELECT COUNT(*) FROM calls WHERE business_id=b.id) as total_calls
+        FROM users u LEFT JOIN businesses b ON b.user_id=u.id
+        WHERE u.role='client' ORDER BY u.created_at DESC
+    """)
+    return render_template('admin/clients.html', clients=clients)
+
+
+@app.route('/admin/clients/<user_id>/activate', methods=['POST'])
+@login_required
+@admin_required
+def admin_activate_client(user_id):
+    execute_db("UPDATE users SET status='active' WHERE id=%s", (user_id,))
+    biz = query_db("SELECT id FROM businesses WHERE user_id=%s", (user_id,), one=True)
+    if biz:
+        execute_db("UPDATE businesses SET status='active' WHERE id=%s", (biz['id'],))
+    flash('Client activated.', 'success')
+    return redirect(url_for('admin_clients'))
+
+
+@app.route('/admin/clients/<user_id>/suspend', methods=['POST'])
+@login_required
+@admin_required
+def admin_suspend_client(user_id):
+    execute_db("UPDATE users SET status='suspended' WHERE id=%s", (user_id,))
+    flash('Client suspended.', 'success')
+    return redirect(url_for('admin_clients'))
+
+
+@app.route('/admin/numbers')
+@login_required
+@admin_required
+def admin_numbers():
+    numbers = query_db("""
+        SELECT p.*, b.name as business_name FROM phone_numbers p
+        LEFT JOIN businesses b ON p.business_id=b.id ORDER BY p.created_at DESC
+    """)
+    return render_template('admin/numbers.html', numbers=numbers)
+
+
+@app.route('/admin/numbers/search', methods=['POST'])
+@login_required
+@admin_required
+def admin_search_numbers():
+    country = request.form.get('country', 'GB')
+    numbers = twilio_service.search_numbers(country=country)
+    flash(f'Found {len(numbers)} available numbers.', 'info')
+    return render_template('admin/numbers.html',
+                           numbers=query_db("SELECT p.*, b.name as business_name FROM phone_numbers p LEFT JOIN businesses b ON p.business_id=b.id ORDER BY p.created_at DESC"),
+                           available=numbers)
+
+
+@app.route('/admin/numbers/buy', methods=['POST'])
+@login_required
+@admin_required
+def admin_buy_number():
+    number = request.form.get('number')
+    result = twilio_service.buy_number(number, 'pool')
+    if result:
+        execute_db("INSERT INTO phone_numbers (number, twilio_sid, status) VALUES (%s,%s,'available')",
+                   (result['number'], result['sid']))
+        flash(f'Purchased {result["number"]}.', 'success')
+    else:
+        flash('Failed to purchase number.', 'error')
+    return redirect(url_for('admin_numbers'))
+
+
+@app.route('/admin/numbers/assign', methods=['POST'])
+@login_required
+@admin_required
+def admin_assign_number():
+    number_id = request.form.get('number_id')
+    business_id = request.form.get('business_id')
+    execute_db("UPDATE phone_numbers SET business_id=%s, status='assigned' WHERE id=%s",
+               (business_id, number_id))
+    flash('Number assigned.', 'success')
+    return redirect(url_for('admin_numbers'))
+
+
+# ───────────────────────────────────────────
+# TWILIO WEBHOOKS — THE CALL ENGINE
+# ───────────────────────────────────────────
+
+@app.route('/webhook/incoming-call', methods=['POST'])
+def webhook_incoming_call():
+    """Main entry: Twilio hits this when a call comes in to any of our numbers."""
+    called_number = request.form.get('Called', '')
+    caller_number = request.form.get('From', '')
+    call_sid = request.form.get('CallSid', '')
+
+    # Find which business owns this number
+    biz = get_business_by_number(called_number)
+    if not biz:
+        resp = VoiceResponse()
+        resp.say("Sorry, this number is not configured. Goodbye.", voice='Polly.Amy')
+        resp.hangup()
+        return Response(str(resp), mimetype='text/xml')
+
+    biz_id = str(biz['id'])
+
+    # Create call record
+    insert_db("""INSERT INTO calls (business_id, twilio_call_sid, caller_number, called_number, direction, status)
+                 VALUES (%s,%s,%s,%s,'inbound','in_progress') RETURNING id""",
+              (biz_id, call_sid, caller_number, called_number))
+
+    # Track active calls
+    cache_incr(f"active_calls:{biz_id}")
+
+    # Start recording
+    twilio_service.start_recording(call_sid)
+
+    # Check business hours
+    hours = biz.get('business_hours')
+    if hours and isinstance(hours, str):
+        try:
+            hours = json.loads(hours)
+        except Exception:
+            hours = {}
+
+    if not is_within_business_hours(hours):
+        after_msg = biz.get('after_hours_message') or f"Thank you for calling {biz['name']}. We are currently closed."
+        return Response(twilio_service.twiml_after_hours(after_msg), mimetype='text/xml')
+
+    # Get caller history for AI context
+    caller_hist = get_caller_history(biz_id, caller_number, limit=2)
+    cache_set(f"caller_hist:{call_sid}", caller_hist or [], ex=1800)
+
+    # Initialize conversation log in cache
+    cache_set(f"conv:{call_sid}", [], ex=1800)
+
+    # Greet and gather
+    greeting = biz.get('greeting') or f"Hello, thank you for calling {biz['name']}. How can I help you?"
+    return Response(
+        twilio_service.twiml_greet_and_gather(greeting, biz_id, call_sid),
+        mimetype='text/xml')
+
+
+@app.route('/webhook/gather-response', methods=['POST'])
+def webhook_gather_response():
+    """Handle speech input from caller, generate AI response."""
+    speech_result = request.form.get('SpeechResult', '')
+    biz_id = request.args.get('business_id', '')
+    call_sid = request.args.get('call_sid', '')
+    turn = int(request.args.get('turn', 0))
+
+    if not speech_result:
+        resp = VoiceResponse()
+        resp.say("I didn't catch that. Could you please repeat?", voice='Polly.Amy')
+        g = Gather(input='speech',
+                   action=f"/webhook/gather-response?business_id={biz_id}&call_sid={call_sid}&turn={turn}",
+                   method='POST', timeout=5, speech_timeout=3, language='en-GB')
+        resp.append(g)
+        return Response(str(resp), mimetype='text/xml')
+
+    biz = query_db("SELECT * FROM businesses WHERE id=%s", (biz_id,), one=True)
+    if not biz:
+        resp = VoiceResponse()
+        resp.say("Sorry, there was an error. Goodbye.", voice='Polly.Amy')
+        resp.hangup()
+        return Response(str(resp), mimetype='text/xml')
+
+    # Get conversation log from cache
+    conv_log = cache_get(f"conv:{call_sid}", as_json=True) or []
+    conv_log.append({'role': 'Caller', 'text': speech_result})
+
+    # Get caller history from cache
+    caller_hist = cache_get(f"caller_hist:{call_sid}", as_json=True)
+
+    # Get knowledge base docs for context
+    kb_docs = query_db("SELECT title, content FROM knowledge_base WHERE business_id=%s AND active=TRUE", (biz_id,))
+
+    # Build config for Gemini
+    config = {
+        'greeting': biz.get('greeting', ''),
+        'agent_personality': biz.get('agent_personality', ''),
+        'services': biz.get('config', {}).get('services', '') if isinstance(biz.get('config'), dict) else '',
+        'business_hours': str(biz.get('business_hours', '')),
+        'transfer_number': biz.get('transfer_number', ''),
+        'restricted_info': biz.get('restricted_info', ''),
+        'special_instructions': '',
+        'faq': biz.get('faq') if isinstance(biz.get('faq'), list) else [],
+        'knowledge_base': [{'title': d['title'], 'content': d['content']} for d in kb_docs] if kb_docs else []
+    }
+
+    # Generate AI response with caller history
+    ai_response = gemini_service.generate_agent_response(
+        speech_result, config, conversation_log=conv_log, caller_history=caller_hist)
+
+    # Check for transfer intent
+    transfer_keywords = ['transfer', 'speak to someone', 'human', 'real person', 'manager']
+    needs_transfer = any(kw in speech_result.lower() for kw in transfer_keywords)
+    if needs_transfer and biz.get('transfer_number'):
+        conv_log.append({'role': 'Agent', 'text': 'Transferring to human.'})
+        cache_set(f"conv:{call_sid}", conv_log, ex=1800)
+        return Response(
+            twilio_service.twiml_transfer(biz['transfer_number']),
+            mimetype='text/xml')
+
+    conv_log.append({'role': 'Agent', 'text': ai_response})
+    cache_set(f"conv:{call_sid}", conv_log, ex=1800)
+
+    # Max 15 turns then end gracefully
+    if turn >= 15:
+        resp = VoiceResponse()
+        resp.say(ai_response + " Thank you for calling. Have a great day!", voice='Polly.Amy')
+        resp.hangup()
+        return Response(str(resp), mimetype='text/xml')
+
+    return Response(
+        twilio_service.twiml_respond_and_gather(ai_response, biz_id, call_sid, turn),
+        mimetype='text/xml')
+
+
+@app.route('/webhook/transfer', methods=['POST'])
+def webhook_transfer():
+    biz_id = request.args.get('business_id', '')
+    biz = query_db("SELECT * FROM businesses WHERE id=%s", (biz_id,), one=True)
+    transfer = biz.get('transfer_number', '') if biz else ''
+    if transfer:
+        return Response(twilio_service.twiml_transfer(transfer), mimetype='text/xml')
+    resp = VoiceResponse()
+    resp.say("Sorry, no one is available. Please try again later.", voice='Polly.Amy')
+    resp.hangup()
+    return Response(str(resp), mimetype='text/xml')
+
+
+@app.route('/webhook/call-status', methods=['POST'])
+def webhook_call_status():
+    """Twilio status callback — fires when call completes."""
+    call_sid = request.form.get('CallSid', '')
+    status = request.form.get('CallStatus', '')
+    duration = int(request.form.get('CallDuration', 0) or 0)
+
+    if status == 'completed':
+        call = query_db("SELECT * FROM calls WHERE twilio_call_sid=%s", (call_sid,), one=True)
+        if call:
+            biz_id = str(call['business_id'])
+
+            # Get conversation log
+            conv_log = cache_get(f"conv:{call_sid}", as_json=True) or []
+
+            # Get recording URL
+            recording_url = twilio_service.get_recording_url(call_sid)
+
+            # Analyze call with Gemini
+            biz = query_db("SELECT * FROM businesses WHERE id=%s", (biz_id,), one=True)
+            analysis = None
+            if recording_url and biz:
+                analysis = gemini_service.analyze_call_recording(
+                    recording_url, biz['name'], biz.get('business_type', ''))
+            elif conv_log and biz:
+                transcript = "\n".join(f"{e['role']}: {e['text']}" for e in conv_log)
+                analysis = gemini_service.analyze_call_transcript(
+                    transcript, biz['name'], biz.get('business_type', ''))
+
+            if analysis:
+                execute_db("""UPDATE calls SET status='completed', duration_seconds=%s,
+                              recording_url=%s, transcript=%s, summary=%s, category=%s,
+                              sentiment=%s, caller_intent=%s, resolution=%s,
+                              action_items=%s, conversation_log=%s, completed_at=NOW()
+                              WHERE twilio_call_sid=%s""",
+                           (duration, recording_url,
+                            analysis.get('transcript', ''), analysis.get('summary', ''),
+                            analysis.get('category', 'other'), analysis.get('sentiment', 'neutral'),
+                            analysis.get('caller_intent', ''), analysis.get('resolution', 'unresolved'),
+                            json.dumps(analysis.get('action_items', [])), json.dumps(conv_log),
+                            call_sid))
+
+                # Auto-create ticket if needed
+                if analysis.get('should_create_ticket') and analysis.get('ticket_data'):
+                    td = analysis['ticket_data']
+                    execute_db("""INSERT INTO tickets (business_id, call_id, type, priority, subject,
+                                  description, caller_name, caller_number)
+                                  VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+                               (biz_id, str(call['id']), td.get('type', 'enquiry'),
+                                td.get('priority', 'normal'), td.get('subject', 'New ticket'),
+                                td.get('description', ''), td.get('caller_name', ''),
+                                call.get('caller_number', '')))
+            else:
+                # No analysis available, still update status
+                execute_db("""UPDATE calls SET status='completed', duration_seconds=%s,
+                              recording_url=%s, conversation_log=%s, completed_at=NOW()
+                              WHERE twilio_call_sid=%s""",
+                           (duration, recording_url, json.dumps(conv_log), call_sid))
+
+            # Update minutes
+            add_call_minutes(biz_id, duration)
+
+            # Decrement active calls
+            cache_decr(f"active_calls:{biz_id}")
+
+    elif status in ('busy', 'no-answer', 'canceled', 'failed'):
+        execute_db("UPDATE calls SET status='missed' WHERE twilio_call_sid=%s", (call_sid,))
+        call = query_db("SELECT business_id FROM calls WHERE twilio_call_sid=%s", (call_sid,), one=True)
+        if call:
+            cache_decr(f"active_calls:{str(call['business_id'])}")
+
+    return '', 204
+
+
+@app.route('/webhook/voicemail-complete', methods=['POST'])
+def webhook_voicemail_complete():
+    recording_url = request.form.get('RecordingUrl', '')
+    call_sid = request.form.get('CallSid', '')
+    execute_db("UPDATE calls SET status='voicemail', recording_url=%s WHERE twilio_call_sid=%s",
+               (recording_url, call_sid))
+    resp = VoiceResponse()
+    resp.say("Thank you. Goodbye.", voice='Polly.Amy')
+    resp.hangup()
+    return Response(str(resp), mimetype='text/xml')
+
+
+@app.route('/webhook/call-fallback', methods=['POST'])
+def webhook_call_fallback():
+    resp = VoiceResponse()
+    resp.say("We're experiencing technical difficulties. Please try again later.", voice='Polly.Amy')
+    resp.hangup()
+    return Response(str(resp), mimetype='text/xml')
+
+
+@app.route('/webhook/recording-status', methods=['POST'])
+def webhook_recording_status():
+    return '', 204
+
+
+@app.route('/webhook/incoming-sms', methods=['POST'])
+def webhook_incoming_sms():
+    return '', 204
+
+
+# ─── ONBOARDING WEBHOOKS ──────────────────
+
+@app.route('/webhook/onboarding-start', methods=['POST'])
+def webhook_onboarding_start():
+    """First question of the onboarding interview."""
+    biz_id = request.args.get('business_id', '')
+    ob_id = request.args.get('onboarding_id', '')
+    questions = cache_get(f"onboarding_q:{ob_id}", as_json=True)
+    if not questions or len(questions) == 0:
+        resp = VoiceResponse()
+        resp.say("Sorry, there was a setup error. We'll call you back.", voice='Polly.Amy')
+        resp.hangup()
+        return Response(str(resp), mimetype='text/xml')
+
+    # Welcome message + first question
+    resp = VoiceResponse()
+    resp.say("Hello! I'm going to ask you a few questions to set up your AI receptionist. Let's get started!",
+             voice='Polly.Amy', language='en-GB')
+    resp.pause(length=1)
+    return Response(
+        str(resp) + twilio_service.twiml_onboarding_question(
+            questions[0]['question'], biz_id, ob_id, 0),
+        mimetype='text/xml')
+
+
+@app.route('/webhook/onboarding-answer', methods=['POST'])
+def webhook_onboarding_answer():
+    """Process an onboarding answer, move to next question."""
+    speech = request.form.get('SpeechResult', '')
+    biz_id = request.args.get('business_id', '')
+    ob_id = request.args.get('onboarding_id', '')
+    q_idx = int(request.args.get('q', 0))
+
+    questions = cache_get(f"onboarding_q:{ob_id}", as_json=True) or []
+
+    # Store answer
+    answers = cache_get(f"onboarding_a:{ob_id}", as_json=True) or {}
+    if q_idx < len(questions):
+        field_name = questions[q_idx].get('field_name', f'question_{q_idx}')
+        answers[field_name] = speech
+    cache_set(f"onboarding_a:{ob_id}", answers, ex=3600)
+
+    # Next question or finish
+    next_idx = q_idx + 1
+    if next_idx < len(questions):
+        return Response(
+            twilio_service.twiml_onboarding_question(
+                questions[next_idx]['question'], biz_id, ob_id, next_idx),
+            mimetype='text/xml')
+
+    # All questions answered — build agent config
+    biz = query_db("SELECT * FROM businesses WHERE id=%s", (biz_id,), one=True)
+    if biz:
+        config = gemini_service.build_agent_config(biz['name'], biz.get('business_type', ''), answers)
+        execute_db("""UPDATE businesses SET
+                      greeting=%s, agent_personality=%s, after_hours_message=%s,
+                      transfer_number=%s, restricted_info=%s, faq=%s, config=%s,
+                      status='ready_for_review', updated_at=NOW() WHERE id=%s""",
+                   (config.get('greeting', ''), config.get('agent_personality', ''),
+                    config.get('after_hours_message', ''), config.get('transfer_number', ''),
+                    config.get('restricted_info', ''), json.dumps(config.get('faq', [])),
+                    json.dumps(config), biz_id))
+        execute_db("UPDATE users SET status='ready_for_review' WHERE id=%s", (biz['user_id'],))
+
+    # Save onboarding data
+    execute_db("""UPDATE onboarding_calls SET extracted_data=%s, status='completed', completed_at=NOW()
+                  WHERE id=%s""", (json.dumps(answers), ob_id))
+
+    return Response(twilio_service.twiml_onboarding_complete(), mimetype='text/xml')
+
+
+@app.route('/webhook/onboarding-next', methods=['POST', 'GET'])
+def webhook_onboarding_next():
+    """Skip to next onboarding question (when no speech detected)."""
+    biz_id = request.args.get('business_id', '')
+    ob_id = request.args.get('onboarding_id', '')
+    q_idx = int(request.args.get('q', 0))
+    questions = cache_get(f"onboarding_q:{ob_id}", as_json=True) or []
+
+    if q_idx < len(questions):
+        return Response(
+            twilio_service.twiml_onboarding_question(
+                questions[q_idx]['question'], biz_id, ob_id, q_idx),
+            mimetype='text/xml')
+
+    return Response(twilio_service.twiml_onboarding_complete(), mimetype='text/xml')
+
+
+@app.route('/webhook/onboarding-status', methods=['POST'])
+def webhook_onboarding_status():
+    return '', 204
+
+
+# ───────────────────────────────────────────
+# API ENDPOINTS
+# ───────────────────────────────────────────
+
+@app.route('/api/usage')
+@login_required
+def api_usage():
+    biz_id = session.get('business_id')
+    usage = get_or_create_usage(biz_id)
+    return jsonify({
+        'minutes_used': float(usage['minutes_used']) if usage else 0,
+        'minutes_limit': usage['minutes_limit'] if usage else 200,
+        'active_calls': int(cache_get(f"active_calls:{biz_id}") or 0)
+    })
+
+
+@app.route('/api/calls/live')
+@login_required
+def api_live_calls():
+    biz_id = session.get('business_id')
+    active = query_db(
+        "SELECT * FROM calls WHERE business_id=%s AND status='in_progress' ORDER BY created_at DESC",
+        (biz_id,))
+    return jsonify([{
+        'id': str(c['id']), 'caller': c['caller_number'],
+        'started': str(c['created_at']), 'duration': c['duration_seconds']
+    } for c in (active or [])])
+
+
+# ───────────────────────────────────────────
+# ERRORS
+# ───────────────────────────────────────────
+
+@app.errorhandler(403)
+def forbidden(e):
+    return render_template('public/error.html', code=403, msg='Access denied.'), 403
+
+
+@app.errorhandler(404)
+def not_found(e):
+    return render_template('public/error.html', code=404, msg='Page not found.'), 404
+
+
+@app.errorhandler(500)
+def server_error(e):
+    return render_template('public/error.html', code=500, msg='Something went wrong.'), 500
+
+
+# ───────────────────────────────────────────
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)

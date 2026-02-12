@@ -1,0 +1,44 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Clients — VoiceBot Admin{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>All Clients</h1>
+    <p>Manage client accounts</p>
+</div>
+
+<div class="card">
+    <div class="card-body no-pad">
+        {% if clients %}
+        <table class="data-table">
+            <thead><tr><th>Name</th><th>Email</th><th>Business</th><th>Tier</th><th>Calls</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+            {% for c in clients %}
+            <tr>
+                <td>{{ c.name }}</td>
+                <td style="font-size:0.85rem;">{{ c.email }}</td>
+                <td>{{ c.business_name or '-' }}</td>
+                <td><span class="badge badge-neutral" style="text-transform:capitalize;">{{ c.tier or 'starter' }}</span></td>
+                <td>{{ c.total_calls or 0 }}</td>
+                <td><span class="badge badge-{{ c.status }}">{{ c.status }}</span></td>
+                <td style="display:flex;gap:6px;">
+                    {% if c.status != 'active' %}
+                    <form method="POST" action="{{ url_for('admin_activate_client', user_id=c.id) }}">
+                        <button class="btn btn-sm btn-primary">Activate</button>
+                    </form>
+                    {% endif %}
+                    {% if c.status == 'active' %}
+                    <form method="POST" action="{{ url_for('admin_suspend_client', user_id=c.id) }}">
+                        <button class="btn btn-sm btn-danger">Suspend</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state"><h3>No clients yet</h3></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

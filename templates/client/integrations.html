@@ -1,0 +1,91 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Integrations{% endblock %}
+{% block page_title %}Integrations{% endblock %}
+
+{% block content %}
+<p class="text-muted mb-24">Connect your tools to automatically sync call data and enable new capabilities.</p>
+
+<div class="grid-auto">
+    <!-- Gmail -->
+    <div class="card">
+        <div class="flex gap-12 mb-16" style="align-items: center;">
+            <div style="font-size: 2rem;">📧</div>
+            <div>
+                <h3>Gmail</h3>
+                <p class="text-small text-muted">Send follow-up emails after calls</p>
+            </div>
+        </div>
+        <p class="text-small text-muted mb-16">Automatically email call summaries to your inbox and send follow-ups to callers.</p>
+        {% set gmail = integrations | selectattr('type', 'equalto', 'gmail') | first %}
+        {% if gmail and gmail.status == 'active' %}
+        <span class="badge badge-green">Connected</span>
+        {% else %}
+        <button class="btn btn-secondary btn-sm" disabled>Connect — Growth Plan</button>
+        {% endif %}
+    </div>
+
+    <!-- Google Calendar -->
+    <div class="card">
+        <div class="flex gap-12 mb-16" style="align-items: center;">
+            <div style="font-size: 2rem;">📅</div>
+            <div>
+                <h3>Google Calendar</h3>
+                <p class="text-small text-muted">Book appointments during calls</p>
+            </div>
+        </div>
+        <p class="text-small text-muted mb-16">Let the AI check availability and book appointments directly into your calendar.</p>
+        {% set gcal = integrations | selectattr('type', 'equalto', 'google_calendar') | first %}
+        {% if gcal and gcal.status == 'active' %}
+        <span class="badge badge-green">Connected</span>
+        {% else %}
+        <button class="btn btn-secondary btn-sm" disabled>Connect — Growth Plan</button>
+        {% endif %}
+    </div>
+
+    <!-- Google Sheets -->
+    <div class="card">
+        <div class="flex gap-12 mb-16" style="align-items: center;">
+            <div style="font-size: 2rem;">📊</div>
+            <div>
+                <h3>Google Sheets</h3>
+                <p class="text-small text-muted">Auto-log calls to a spreadsheet</p>
+            </div>
+        </div>
+        <p class="text-small text-muted mb-16">Every call is automatically logged to a Google Sheet with full details.</p>
+        {% set gsheet = integrations | selectattr('type', 'equalto', 'google_sheets') | first %}
+        {% if gsheet and gsheet.status == 'active' %}
+        <span class="badge badge-green">Connected</span>
+        {% else %}
+        <button class="btn btn-secondary btn-sm" disabled>Connect — Growth Plan</button>
+        {% endif %}
+    </div>
+
+    <!-- Webhook -->
+    <div class="card">
+        <div class="flex gap-12 mb-16" style="align-items: center;">
+            <div style="font-size: 2rem;">🔗</div>
+            <div>
+                <h3>Webhook / API</h3>
+                <p class="text-small text-muted">Push events to your system</p>
+            </div>
+        </div>
+        <p class="text-small text-muted mb-16">Send call data to any external system via webhooks. Connects to any CRM or ERP.</p>
+        {% set webhook = integrations | selectattr('type', 'equalto', 'webhook') | first %}
+        {% if webhook and webhook.status == 'active' %}
+        <span class="badge badge-green">Connected</span>
+        {% else %}
+        <button class="btn btn-secondary btn-sm" disabled>Connect — Enterprise Plan</button>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mt-24" style="border-color: var(--accent); background: var(--accent-glow);">
+    <div class="flex-between">
+        <div>
+            <h3 style="color: var(--accent-light);">Need more integrations?</h3>
+            <p class="text-small text-muted mt-8">Upgrade your plan to unlock Gmail, Calendar, Sheets, and API access.</p>
+        </div>
+        <a href="{{ url_for('client_billing') }}" class="btn btn-primary">Upgrade Plan</a>
+    </div>
+</div>
+{% endblock %}

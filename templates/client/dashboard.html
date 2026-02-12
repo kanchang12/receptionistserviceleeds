@@ -1,0 +1,115 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Dashboard — VoiceBot{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ business.name }}</h1>
+    <p>{% if business.status == 'active' %}Your AI receptionist is live{% elif business.status == 'pending' %}Complete onboarding to activate{% else %}Status: {{ business.status }}{% endif %}</p>
+</div>
+
+{% if business.status in ('pending', 'onboarding') %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-body" style="text-align:center;padding:48px;">
+        <h3 style="margin-bottom:12px;">Complete Your Setup</h3>
+        <p style="color:var(--text-secondary);margin-bottom:24px;">Your AI receptionist needs to be configured. Start the onboarding interview to get set up.</p>
+        <a href="{{ url_for('client_onboarding') }}" class="btn btn-primary">Start Onboarding</a>
+    </div>
+</div>
+{% endif %}
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Today's Calls</div>
+        <div class="stat-value accent">{{ today_calls }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Active Now</div>
+        <div class="stat-value green">{{ active_calls }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Minutes Used</div>
+        <div class="stat-value">{{ "%.0f"|format(usage.minutes_used|float) if usage else 0 }}</div>
+        <div class="stat-sub">of {{ usage.minutes_limit if usage else 200 }} this month</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Open Tickets</div>
+        <div class="stat-value blue">{{ tickets|length if tickets else 0 }}</div>
+    </div>
+</div>
+
+{% if usage %}
+{% set pct = (usage.minutes_used|float / usage.minutes_limit * 100) if usage.minutes_limit > 0 else 0 %}
+<div class="usage-section">
+    <div class="usage-header">
+        <h3>Minutes Usage</h3>
+        <span>{{ "%.0f"|format(usage.minutes_used|float) }} / {{ usage.minutes_limit }} min</span>
+    </div>
+    <div class="usage-bar-track">
+        <div class="usage-bar-fill {% if pct > 90 %}warn{% endif %}" style="width: {{ [pct, 100]|min }}%"></div>
+    </div>
+</div>
+{% endif %}
+
+{% if phone %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-body">
+        <div class="stat-label">Your Phone Number</div>
+        <div class="stat-value" style="font-family:var(--font-mono);font-size:1.4rem;">{{ phone.number }}</div>
+        <div class="stat-sub">Callers dial this number to reach your AI receptionist</div>
+    </div>
+</div>
+{% endif %}
+
+<div class="two-col">
+    <div class="card">
+        <div class="card-header">
+            <h3>Recent Calls</h3>
+            <a href="{{ url_for('client_calls') }}" class="btn btn-sm btn-secondary">View All</a>
+        </div>
+        <div class="card-body no-pad">
+            {% if calls %}
+            <table class="data-table">
+                <thead><tr><th>Caller</th><th>Category</th><th>Sentiment</th><th>Duration</th></tr></thead>
+                <tbody>
+                {% for c in calls[:5] %}
+                <tr onclick="location.href='{{ url_for('client_call_detail', call_id=c.id) }}'" style="cursor:pointer;">
+                    <td style="font-family:var(--font-mono);font-size:0.85rem;">{{ c.caller_number or 'Unknown' }}</td>
+                    <td><span class="badge badge-neutral">{{ c.category or 'other' }}</span></td>
+                    <td><span class="badge badge-{{ c.sentiment or 'neutral' }}-s">{{ c.sentiment or 'neutral' }}</span></td>
+                    <td>{{ ((c.duration_seconds or 0) / 60)|round(1) }}m</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state"><h3>No calls yet</h3><p>Calls will appear here once your receptionist starts taking them.</p></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Open Tickets</h3>
+            <a href="{{ url_for('client_tickets') }}" class="btn btn-sm btn-secondary">View All</a>
+        </div>
+        <div class="card-body no-pad">
+            {% if tickets %}
+            <table class="data-table">
+                <thead><tr><th>Subject</th><th>Type</th><th>Priority</th></tr></thead>
+                <tbody>
+                {% for t in tickets[:5] %}
+                <tr>
+                    <td>{{ t.subject or 'No subject' }}</td>
+                    <td><span class="badge badge-neutral">{{ t.type }}</span></td>
+                    <td><span class="badge badge-{{ t.priority }}">{{ t.priority }}</span></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state"><h3>No open tickets</h3><p>Tickets from calls will appear here automatically.</p></div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

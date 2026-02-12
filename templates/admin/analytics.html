@@ -1,0 +1,81 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Analytics{% endblock %}
+{% block page_title %}Analytics{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+    <!-- Top Clients -->
+    <div class="card">
+        <div class="card-header">
+            <h3>📊 Top Clients by Calls</h3>
+        </div>
+        {% if top_clients %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Business</th>
+                        <th>Total Calls</th>
+                        <th>Total Minutes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for client in top_clients %}
+                    <tr>
+                        <td>{{ client.name }}</td>
+                        <td class="font-mono">{{ client.total_calls }}</td>
+                        <td class="font-mono">{{ "%.0f" | format(client.total_seconds / 60) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><p>No data yet.</p></div>
+        {% endif %}
+    </div>
+
+    <!-- Call Categories -->
+    <div class="card">
+        <div class="card-header">
+            <h3>🏷 Call Categories</h3>
+        </div>
+        {% if categories %}
+        {% for cat in categories %}
+        <div class="flex-between" style="padding: 10px 0; border-bottom: 1px solid var(--border);">
+            <span class="badge {% if cat.category == 'complaint' %}badge-red{% elif cat.category == 'order' %}badge-green{% elif cat.category == 'booking' %}badge-blue{% elif cat.category == 'enquiry' %}badge-yellow{% else %}badge-muted{% endif %}">
+                {{ cat.category }}
+            </span>
+            <span class="font-mono text-small">{{ cat.count }} calls</span>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-state"><p>No categorised calls yet.</p></div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Daily Call Volume -->
+<div class="card mt-24">
+    <div class="card-header">
+        <h3>📈 Daily Call Volume (Last 30 Days)</h3>
+    </div>
+    {% if daily_stats %}
+    <div style="overflow-x: auto;">
+        <div style="display: flex; align-items: flex-end; gap: 4px; height: 200px; padding: 16px 0;">
+            {% set max_calls = daily_stats | map(attribute='calls') | max %}
+            {% for day in daily_stats %}
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; min-width: 24px;" title="{{ day.date }} — {{ day.calls }} calls">
+                <div style="width: 100%; max-width: 32px; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 4px; height: {{ (day.calls / max_calls * 160) | int }}px; transition: height 0.3s;"></div>
+                <div class="text-small text-muted" style="font-size: 0.65rem; margin-top: 4px; writing-mode: vertical-rl; transform: rotate(180deg);">
+                    {{ day.date.strftime('%d') if day.date else '' }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state"><p>No call data in the last 30 days.</p></div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}VoiceBot — AI Receptionist for Your Business{% endblock %}
+{% block body_class %}landing-body{% endblock %}
+{% block body %}
+
+<nav class="landing-nav">
+    <div class="landing-brand"><span class="brand-dot"></span> VoiceBot</div>
+    <div class="landing-nav-links">
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="{{ url_for('login') }}">Login</a>
+        <a href="{{ url_for('register') }}" class="hero-btn hero-btn-primary" style="padding:8px 20px;font-size:0.85rem;border-radius:8px;">Get Started</a>
+    </div>
+</nav>
+
+<section class="hero">
+    <div class="hero-eyebrow">⚡ Powered by Gemini AI</div>
+    <h1>Your business deserves an <em>intelligent</em> receptionist</h1>
+    <p class="hero-sub">AI voice agent that answers calls, handles enquiries, books appointments, and creates tickets — 24/7. Set up in under 30 minutes.</p>
+    <div class="hero-actions">
+        <a href="{{ url_for('register') }}" class="hero-btn hero-btn-primary">Start Free Trial</a>
+        <a href="#features" class="hero-btn hero-btn-secondary">See How It Works</a>
+    </div>
+</section>
+
+<section class="features-section" id="features">
+    <h2>Everything your business needs</h2>
+    <div class="features-grid">
+        <div class="feature-card">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+            </div>
+            <h3>AI Voice Agent</h3>
+            <p>Gemini-powered receptionist that understands context, remembers repeat callers, and handles natural conversations.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+            </div>
+            <h3>Auto-Ticketing</h3>
+            <p>Every call is analysed. Orders, complaints, and bookings automatically become trackable tickets in your dashboard.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <h3>24/7 Availability</h3>
+            <p>Business hours routing, after-hours voicemail, and smart escalation to your team when needed.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72"/></svg>
+            </div>
+            <h3>Caller Recognition</h3>
+            <p>Knows who's calling based on history. Previous call summaries are passed to AI for personalised service.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <h3>Smart Transcripts</h3>
+            <p>Full transcription, sentiment analysis, call categorisation, and action item extraction from every call.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2"/><circle cx="12" cy="12" r="3"/></svg>
+            </div>
+            <h3>Easy Setup</h3>
+            <p>Onboarding via AI interview call. Answer 8 questions, and your receptionist is configured and ready to go.</p>
+        </div>
+    </div>
+</section>
+
+<section class="pricing-section" id="pricing">
+    <h2>Simple, transparent pricing</h2>
+    <div class="pricing-grid">
+        <div class="pricing-card">
+            <div class="pricing-tier">Starter</div>
+            <div class="pricing-price">£29<span>/mo</span></div>
+            <div class="pricing-desc">For small businesses getting started</div>
+            <ul class="pricing-features">
+                <li>200 minutes/month</li>
+                <li>1 phone number</li>
+                <li>Call logs & recordings</li>
+                <li>Auto-ticketing</li>
+                <li>Knowledge base</li>
+            </ul>
+            <a href="{{ url_for('register') }}" class="btn btn-secondary pricing-cta">Get Started</a>
+        </div>
+        <div class="pricing-card featured">
+            <div class="pricing-tier">Growth</div>
+            <div class="pricing-price">£79<span>/mo</span></div>
+            <div class="pricing-desc">For growing businesses</div>
+            <ul class="pricing-features">
+                <li>600 minutes/month</li>
+                <li>2 phone numbers</li>
+                <li>Everything in Starter</li>
+                <li>Sentiment analysis</li>
+                <li>SMS notifications</li>
+                <li>Priority support</li>
+            </ul>
+            <a href="{{ url_for('register') }}" class="btn btn-primary pricing-cta">Get Started</a>
+        </div>
+        <div class="pricing-card">
+            <div class="pricing-tier">Enterprise</div>
+            <div class="pricing-price">£199<span>/mo</span></div>
+            <div class="pricing-desc">For high-volume operations</div>
+            <ul class="pricing-features">
+                <li>2000 minutes/month</li>
+                <li>5 phone numbers</li>
+                <li>Everything in Growth</li>
+                <li>API access</li>
+                <li>White-label option</li>
+                <li>Dedicated account manager</li>
+            </ul>
+            <a href="{{ url_for('register') }}" class="btn btn-secondary pricing-cta">Contact Sales</a>
+        </div>
+    </div>
+</section>
+
+<footer class="landing-footer">
+    <p>© 2026 VoiceBot. Built for DevDash 2026. Powered by Gemini AI + Twilio.</p>
+</footer>
+
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Admin Dashboard — VoiceBot{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Admin Dashboard</h1>
+    <p>Platform overview</p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Total Clients</div>
+        <div class="stat-value accent">{{ total_clients }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Pending Review</div>
+        <div class="stat-value" style="color:var(--orange);">{{ pending_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Active Clients</div>
+        <div class="stat-value green">{{ active_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Today's Calls</div>
+        <div class="stat-value blue">{{ today_calls }}</div>
+    </div>
+</div>
+
+{% if pending_clients %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header"><h3>Pending Clients</h3></div>
+    <div class="card-body no-pad">
+        <table class="data-table">
+            <thead><tr><th>Name</th><th>Email</th><th>Business</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+            {% for c in pending_clients %}
+            <tr>
+                <td>{{ c.name }}</td>
+                <td style="font-size:0.85rem;">{{ c.email }}</td>
+                <td>{{ c.business_name or '-' }}</td>
+                <td><span class="badge badge-neutral">{{ c.business_type or '-' }}</span></td>
+                <td><span class="badge badge-{{ c.status }}">{{ c.status }}</span></td>
+                <td style="display:flex;gap:6px;">
+                    <form method="POST" action="{{ url_for('admin_activate_client', user_id=c.id) }}">
+                        <button class="btn btn-sm btn-primary">Activate</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">
+        <h3>Recent Calls (All Clients)</h3>
+        <span style="color:var(--text-muted);font-size:0.85rem;">Last 20</span>
+    </div>
+    <div class="card-body no-pad">
+        {% if recent_calls %}
+        <table class="data-table">
+            <thead><tr><th>Time</th><th>Business</th><th>Caller</th><th>Category</th><th>Sentiment</th><th>Duration</th></tr></thead>
+            <tbody>
+            {% for c in recent_calls %}
+            <tr>
+                <td style="font-size:0.85rem;white-space:nowrap;">{{ c.created_at.strftime('%d %b %H:%M') if c.created_at else '-' }}</td>
+                <td>{{ c.business_name or '-' }}</td>
+                <td style="font-family:var(--font-mono);font-size:0.85rem;">{{ c.caller_number or '-' }}</td>
+                <td><span class="badge badge-neutral">{{ c.category or '-' }}</span></td>
+                <td><span class="badge badge-{{ c.sentiment or 'neutral' }}-s">{{ c.sentiment or '-' }}</span></td>
+                <td>{{ ((c.duration_seconds or 0) / 60)|round(1) }}m</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state"><h3>No calls yet</h3></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

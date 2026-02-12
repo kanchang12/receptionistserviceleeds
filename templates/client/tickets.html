@@ -1,0 +1,51 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Tickets — VoiceBot{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Tickets</h1>
+    <p>Auto-generated from call analysis</p>
+</div>
+
+<div class="filter-bar">
+    <a href="?status=all" class="filter-btn {% if status_filter == 'all' %}active{% endif %}">All</a>
+    <a href="?status=open" class="filter-btn {% if status_filter == 'open' %}active{% endif %}">Open</a>
+    <a href="?status=in_progress" class="filter-btn {% if status_filter == 'in_progress' %}active{% endif %}">In Progress</a>
+    <a href="?status=resolved" class="filter-btn {% if status_filter == 'resolved' %}active{% endif %}">Resolved</a>
+    <a href="?status=closed" class="filter-btn {% if status_filter == 'closed' %}active{% endif %}">Closed</a>
+</div>
+
+<div class="card">
+    <div class="card-body no-pad">
+        {% if tickets %}
+        <table class="data-table">
+            <thead><tr><th>Date</th><th>Subject</th><th>Type</th><th>Priority</th><th>Caller</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody>
+            {% for t in tickets %}
+            <tr>
+                <td style="font-size:0.85rem;white-space:nowrap;">{{ t.created_at.strftime('%d %b %H:%M') if t.created_at else '-' }}</td>
+                <td>{{ t.subject or 'No subject' }}</td>
+                <td><span class="badge badge-neutral">{{ t.type }}</span></td>
+                <td><span class="badge badge-{{ t.priority }}">{{ t.priority }}</span></td>
+                <td style="font-family:var(--font-mono);font-size:0.85rem;">{{ t.call_from or t.caller_number or '-' }}</td>
+                <td><span class="badge badge-{{ t.status }}">{{ t.status }}</span></td>
+                <td>
+                    <form method="POST" action="{{ url_for('client_update_ticket', ticket_id=t.id) }}" style="display:flex;gap:6px;">
+                        <select name="status" class="form-select" style="width:auto;padding:4px 8px;font-size:0.8rem;">
+                            <option value="open" {% if t.status == 'open' %}selected{% endif %}>Open</option>
+                            <option value="in_progress" {% if t.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                            <option value="resolved" {% if t.status == 'resolved' %}selected{% endif %}>Resolved</option>
+                            <option value="closed" {% if t.status == 'closed' %}selected{% endif %}>Closed</option>
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-secondary">Update</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state"><h3>No tickets</h3><p>Tickets are created automatically when calls contain orders, complaints, or bookings.</p></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

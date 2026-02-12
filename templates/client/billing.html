@@ -1,0 +1,84 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Billing — VoiceBot{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Billing</h1>
+    <p>Manage your plan and view invoices</p>
+</div>
+
+{% set tier = business.tier or 'starter' %}
+{% set limits = tier_limits.get(tier, tier_limits.starter) %}
+
+<div class="stats-grid" style="grid-template-columns:repeat(3,1fr);">
+    <div class="stat-card">
+        <div class="stat-label">Current Plan</div>
+        <div class="stat-value accent" style="text-transform:capitalize;">{{ tier }}</div>
+        <div class="stat-sub">£{{ limits.price }}/month</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Minutes Used</div>
+        <div class="stat-value">{{ "%.0f"|format(usage.minutes_used|float) if usage else 0 }}</div>
+        <div class="stat-sub">of {{ limits.minutes }} included</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Overage Rate</div>
+        <div class="stat-value" style="font-size:1.4rem;">£0.08<span style="font-size:0.9rem;color:var(--text-muted);">/min</span></div>
+    </div>
+</div>
+
+{% if usage %}
+{% set pct = (usage.minutes_used|float / usage.minutes_limit * 100) if usage.minutes_limit > 0 else 0 %}
+<div class="usage-section">
+    <div class="usage-header">
+        <h3>This Month</h3>
+        <span>{{ "%.0f"|format(pct) }}% used</span>
+    </div>
+    <div class="usage-bar-track">
+        <div class="usage-bar-fill {% if pct > 90 %}warn{% endif %}" style="width: {{ [pct, 100]|min }}%"></div>
+    </div>
+</div>
+{% endif %}
+
+<div class="two-col">
+    <div class="card">
+        <div class="card-header"><h3>Plan Comparison</h3></div>
+        <div class="card-body no-pad">
+            <table class="data-table">
+                <thead><tr><th>Feature</th><th>Starter</th><th>Growth</th><th>Enterprise</th></tr></thead>
+                <tbody>
+                    <tr><td>Price</td><td>£29/mo</td><td>£79/mo</td><td>£199/mo</td></tr>
+                    <tr><td>Minutes</td><td>200</td><td>600</td><td>2000</td></tr>
+                    <tr><td>Phone Numbers</td><td>1</td><td>2</td><td>5</td></tr>
+                    <tr><td>Knowledge Base</td><td>✓</td><td>✓</td><td>✓</td></tr>
+                    <tr><td>Auto-Ticketing</td><td>✓</td><td>✓</td><td>✓</td></tr>
+                    <tr><td>Sentiment Analysis</td><td>—</td><td>✓</td><td>✓</td></tr>
+                    <tr><td>API Access</td><td>—</td><td>—</td><td>✓</td></tr>
+                    <tr><td>White-Label</td><td>—</td><td>—</td><td>✓</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3>Invoice History</h3></div>
+        <div class="card-body no-pad">
+            {% if invoices %}
+            <table class="data-table">
+                <thead><tr><th>Date</th><th>Amount</th><th>Status</th></tr></thead>
+                <tbody>
+                {% for inv in invoices %}
+                <tr>
+                    <td>{{ inv.created_at.strftime('%d %b %Y') if inv.created_at else '-' }}</td>
+                    <td>£{{ "%.2f"|format(inv.amount) }}</td>
+                    <td><span class="badge badge-{{ 'green' if inv.status == 'paid' else 'orange' }}">{{ inv.status }}</span></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state"><h3>No invoices yet</h3><p>Your billing history will appear here.</p></div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

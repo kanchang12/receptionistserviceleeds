@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Sign Up — VoiceBot{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+{% block body %}
+<div class="auth-card">
+    <div class="auth-brand"><span class="brand-dot"></span> VoiceBot</div>
+    <h2>Create your account</h2>
+    <p class="subtitle">Set up your AI receptionist in minutes</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for cat, msg in messages %}
+    <div class="flash flash-{{ cat }}">{{ msg }}</div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+        <div class="form-group">
+            <label class="form-label">Your Name</label>
+            <input type="text" name="name" class="form-input" required placeholder="John Smith">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" name="email" class="form-input" required placeholder="you@company.com">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Phone (for onboarding call)</label>
+            <input type="tel" name="phone" class="form-input" placeholder="+44 7700 900000">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" name="password" class="form-input" required placeholder="Min 8 characters" minlength="8">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Business Name</label>
+            <input type="text" name="business_name" class="form-input" required placeholder="Acme Plumbing Ltd">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Business Type</label>
+            <select name="business_type" class="form-select" required>
+                <option value="">Select...</option>
+                <option value="plumbing">Plumbing</option>
+                <option value="electrical">Electrical</option>
+                <option value="dental">Dental Practice</option>
+                <option value="medical">Medical Practice</option>
+                <option value="legal">Legal / Solicitors</option>
+                <option value="restaurant">Restaurant / Takeaway</option>
+                <option value="salon">Hair / Beauty Salon</option>
+                <option value="estate_agent">Estate Agent</option>
+                <option value="accountant">Accountant</option>
+                <option value="waste_management">Waste Management</option>
+                <option value="cleaning">Cleaning Services</option>
+                <option value="construction">Construction / Trades</option>
+                <option value="other">Other</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Create Account</button>
+    </form>
+    <div class="auth-footer">
+        Already have an account? <a href="{{ url_for('login') }}">Sign in</a>
+    </div>
+</div>
+{% endblock %}
