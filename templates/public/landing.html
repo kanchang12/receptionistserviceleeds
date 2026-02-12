@@ -1,235 +1,454 @@
 {% extends "base.html" %}
-{% block title %}VoiceBot — AI Receptionist for Your Business{% endblock %}
-{% block body_class %}landing-body{% endblock %}
+{% block title %}VoiceBot — AI Receptionist That Answers Every Call{% endblock %}
+{% block body_class %}L{% endblock %}
+{% block head %}
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Fraunces:ital,wght@0,400;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+{% endblock %}
 {% block body %}
 
-<nav class="landing-nav">
-    <div class="landing-brand"><span class="brand-dot"></span> VoiceBot</div>
-    <div class="landing-nav-links">
-        <a href="#how-it-works">How It Works</a>
-        <a href="#features">Features</a>
-        <a href="#pricing">Pricing</a>
-        <a href="#faq">FAQ</a>
-        <a href="{{ url_for('login') }}">Login</a>
-        <a href="{{ url_for('register') }}" class="nav-cta">Get Started Free</a>
+<!-- NAV -->
+<nav class="L-nav">
+    <div class="wrap" style="display:flex;align-items:center;justify-content:space-between;padding-top:14px;padding-bottom:14px">
+        <div class="L-brand"><span class="L-brand-dot"></span> VoiceBot</div>
+        <div class="L-links">
+            <a href="#how">How It Works</a>
+            <a href="#features">Features</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#faq">FAQ</a>
+            <a href="{{ url_for('login') }}">Login</a>
+            <a href="{{ url_for('register') }}" class="cta">Start Free &rarr;</a>
+        </div>
     </div>
 </nav>
 
-<!-- ═══ HERO ═══ -->
-<section class="hero">
-    <div class="hero-bg"></div>
-    <div class="hero-eyebrow">⚡ Powered by Gemini AI &middot; Built for Australian & UK businesses</div>
-    <h1>Never miss a call again with your <span class="gradient-text">AI receptionist</span></h1>
-    <p class="hero-sub">An intelligent voice agent that answers your phone, handles customer enquiries, books appointments, takes messages, and creates tickets — all without you lifting a finger. 24 hours a day, 7 days a week.</p>
-    <div class="hero-actions">
-        <a href="{{ url_for('register') }}" class="hero-btn hero-btn-primary">Start Your Free Trial →</a>
-        <a href="#how-it-works" class="hero-btn hero-btn-secondary">Watch How It Works</a>
-    </div>
-    <p class="hero-note">No credit card required &middot; Setup in under 30 minutes &middot; Cancel anytime</p>
-</section>
-
-<!-- ═══ SOCIAL PROOF ═══ -->
-<section class="social-proof">
-    <p>Trusted by businesses across multiple industries</p>
-    <div class="logo-strip">
-        <span>Plumbing Co.</span>
-        <span>DentaCare</span>
-        <span>GreenWaste</span>
-        <span>LegalEdge</span>
-        <span>FreshBites</span>
-        <span>HomeClean Pro</span>
-    </div>
-</section>
-
-<!-- ═══ HOW IT WORKS ═══ -->
-<section class="how-section" id="how-it-works">
-    <div class="section-label">How It Works</div>
-    <h2 class="section-title">Up and running in three simple steps</h2>
-    <p class="section-subtitle">No technical knowledge required. Our AI interviewer sets everything up for you over a single phone call.</p>
-
-    <div class="steps-grid">
-        <div class="step-card">
-            <div class="step-number">1</div>
-            <h3>Sign up & tell us about your business</h3>
-            <p>Create your account and provide basic details. We'll call you and ask 8 short questions about your services, hours, how you'd like calls handled, and common customer enquiries.</p>
+<!-- HERO -->
+<section class="L-hero">
+    <div class="wrap">
+        <div class="L-hero-content">
+            <div class="L-badge">&#10022; Powered by Gemini AI &mdash; intelligent voice conversations</div>
+            <h1>Your AI receptionist <span>answers every call</span> &mdash; so you don't have to</h1>
+            <p class="L-hero-sub">An intelligent voice agent that picks up your phone, understands your callers, books appointments, creates tickets, and gets smarter with every conversation. Works 24/7. Never calls in sick. Never puts anyone on hold.</p>
+            <div class="L-hero-btns">
+                <a href="{{ url_for('register') }}" class="btn btn-lg btn-primary">Start Your Free Trial &rarr;</a>
+                <a href="#how" class="btn btn-lg btn-white">See How It Works</a>
+            </div>
+            <p class="L-hero-note">No credit card required &middot; Setup in 30 minutes &middot; Cancel anytime</p>
         </div>
-        <div class="step-card">
-            <div class="step-number">2</div>
-            <h3>We build your custom AI agent</h3>
-            <p>Our Gemini AI processes your answers and creates a fully personalised receptionist — complete with your greeting, business knowledge, FAQ responses, and escalation rules.</p>
-        </div>
-        <div class="step-card">
-            <div class="step-number">3</div>
-            <h3>Your phone number goes live</h3>
-            <p>We assign a dedicated phone number (or port your existing one). Calls are answered instantly by your AI, analysed in real-time, and logged in your dashboard with full transcripts.</p>
-        </div>
-    </div>
-</section>
-
-<!-- ═══ FEATURES ═══ -->
-<section class="features-section" id="features">
-    <div class="features-inner">
-        <div class="section-label">Features</div>
-        <h2 class="section-title">Everything you need to handle calls professionally</h2>
-        <p class="section-subtitle">From intelligent conversations to automatic ticketing — your AI receptionist does it all.</p>
-
-        <div class="features-grid">
-            <div class="feature-card">
-                <div class="feature-icon blue">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
-                </div>
-                <h3>Natural Voice Conversations</h3>
-                <p>Powered by Gemini AI, your receptionist understands context, handles complex questions, and speaks naturally — not like a robotic IVR menu.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon green">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72"/></svg>
-                </div>
-                <h3>Repeat Caller Recognition</h3>
-                <p>The AI remembers who's calling. Previous call summaries are automatically passed as context, so returning customers get personalised service every time.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon purple">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
-                </div>
-                <h3>Automatic Ticket Creation</h3>
-                <p>Orders, complaints, bookings, and support requests are automatically extracted from calls and turned into trackable tickets in your dashboard.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon orange">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                </div>
-                <h3>Full Call Transcription</h3>
-                <p>Every call is recorded, transcribed, and analysed. Get summaries, sentiment scores, caller intent, and action items — all processed by Gemini AI.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon red">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                </div>
-                <h3>24/7 Availability</h3>
-                <p>Business hours routing with after-hours voicemail. Your AI answers instantly at 2am or 2pm — no hold music, no missed opportunities, no overtime costs.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon warm">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2"/><circle cx="12" cy="12" r="3"/></svg>
-                </div>
-                <h3>Knowledge Base & FAQ</h3>
-                <p>Upload your business policies, service details, and common Q&A. Your AI uses this as reference to give accurate, consistent answers to every caller.</p>
-            </div>
+        <div class="L-hero-visual">
+            <svg viewBox="0 0 480 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="140" y="30" width="200" height="360" rx="28" fill="#111827" stroke="#374151" stroke-width="2"/>
+                <rect x="152" y="60" width="176" height="310" rx="4" fill="#1e293b"/>
+                <rect x="164" y="80" width="152" height="36" rx="8" fill="#2563eb" opacity=".15"/>
+                <text x="180" y="103" font-family="DM Sans" font-size="13" font-weight="700" fill="#60a5fa">Incoming Call</text>
+                <circle cx="240" cy="160" r="36" fill="#2563eb" opacity=".12"/>
+                <circle cx="240" cy="160" r="24" fill="#2563eb" opacity=".2"/>
+                <path d="M228 155c0-2 2-4 4-4h16c2 0 4 2 4 4v4c0 6-5 11-12 11s-12-5-12-11v-4z" fill="#60a5fa"/>
+                <text x="168" y="214" font-family="DM Sans" font-size="11" font-weight="600" fill="#94a3b8">+44 7700 900 123</text>
+                <text x="168" y="232" font-family="DM Sans" font-size="10" fill="#64748b">Richardson Plumbing enquiry</text>
+                <rect x="164" y="252" width="120" height="28" rx="6" fill="#2563eb"/>
+                <text x="174" y="270" font-family="DM Sans" font-size="9" fill="white">"Hi, I need an emergency plumber"</text>
+                <rect x="196" y="286" width="120" height="28" rx="6" fill="#1e3a5f"/>
+                <text x="206" y="304" font-family="DM Sans" font-size="9" fill="#93c5fd">"I can help! What's the issue?"</text>
+                <rect x="164" y="320" width="100" height="28" rx="6" fill="#2563eb"/>
+                <text x="174" y="338" font-family="DM Sans" font-size="9" fill="white">"Burst pipe in the kitchen"</text>
+                <g transform="translate(340, 80)">
+                    <rect width="120" height="56" rx="10" fill="white" filter="url(#sh)"/>
+                    <text x="14" y="22" font-family="DM Sans" font-size="9" font-weight="600" fill="#111827">Call Duration</text>
+                    <text x="14" y="42" font-family="DM Sans" font-size="18" font-weight="800" fill="#2563eb">2:47</text>
+                </g>
+                <g transform="translate(20, 140)">
+                    <rect width="110" height="56" rx="10" fill="white" filter="url(#sh)"/>
+                    <text x="14" y="22" font-family="DM Sans" font-size="9" font-weight="600" fill="#111827">Sentiment</text>
+                    <text x="14" y="42" font-family="DM Sans" font-size="14" font-weight="700" fill="#059669">Positive</text>
+                </g>
+                <g transform="translate(340, 260)">
+                    <rect width="128" height="56" rx="10" fill="white" filter="url(#sh)"/>
+                    <text x="14" y="22" font-family="DM Sans" font-size="9" font-weight="600" fill="#111827">Ticket Created</text>
+                    <text x="14" y="42" font-family="DM Sans" font-size="11" font-weight="600" fill="#d97706">Emergency Callout</text>
+                </g>
+                <g transform="translate(12, 280)">
+                    <rect width="118" height="56" rx="10" fill="white" filter="url(#sh)"/>
+                    <text x="14" y="22" font-family="DM Sans" font-size="9" font-weight="600" fill="#111827">Today's Calls</text>
+                    <text x="14" y="42" font-family="DM Sans" font-size="18" font-weight="800" fill="#111827">47</text>
+                    <text x="48" y="42" font-family="DM Sans" font-size="10" fill="#059669">+12%</text>
+                </g>
+                <circle cx="240" cy="160" r="50" fill="none" stroke="#2563eb" stroke-width="1" opacity=".2">
+                    <animate attributeName="r" from="50" to="80" dur="2s" repeatCount="indefinite"/>
+                    <animate attributeName="opacity" from=".2" to="0" dur="2s" repeatCount="indefinite"/>
+                </circle>
+                <circle cx="240" cy="160" r="50" fill="none" stroke="#2563eb" stroke-width="1" opacity=".15">
+                    <animate attributeName="r" from="50" to="80" dur="2s" begin="0.7s" repeatCount="indefinite"/>
+                    <animate attributeName="opacity" from=".15" to="0" dur="2s" begin="0.7s" repeatCount="indefinite"/>
+                </circle>
+                <defs><filter id="sh" x="-10" y="-4" width="160" height="80"><feDropShadow dx="0" dy="4" stdDeviation="8" flood-opacity=".08"/></filter></defs>
+            </svg>
         </div>
     </div>
 </section>
 
-<!-- ═══ STATS BANNER ═══ -->
-<section class="stats-banner">
-    <div class="stats-banner-inner">
-        <h2>Built for businesses that care about every call</h2>
-        <div class="stats-row">
-            <div class="stat-item">
-                <h3>99.8%</h3>
-                <p>Uptime guaranteed</p>
+<!-- SOCIAL PROOF -->
+<section class="L-proof">
+    <div class="wrap">
+        <p>Built with trusted infrastructure</p>
+        <div class="L-logos">
+            <span>Google Gemini AI</span>
+            <span>Twilio</span>
+            <span>PostgreSQL</span>
+            <span>Flask</span>
+            <span>GDPR Compliant</span>
+        </div>
+    </div>
+</section>
+
+<!-- WHAT IS -->
+<section class="L-section">
+    <div class="wrap">
+        <div class="L-what">
+            <div>
+                <div class="L-label">What Is VoiceBot?</div>
+                <h2 class="L-title">Your digital employee that never misses a call</h2>
+                <p class="L-what-text" style="margin-top:20px">
+                    VoiceBot is <strong>not a voicemail system</strong>. It's not an IVR menu. It's a smart, conversational AI voice agent that <strong>talks to your customers like a real person</strong>.
+                </p>
+                <p class="L-what-text" style="margin-top:14px">
+                    Here's the reality: <strong>most small businesses miss a significant portion of their incoming calls</strong>. Every missed call is a potential customer walking to your competitor. If you're spending on Google Ads, SEO, or local directories, you're paying to generate leads that nobody answers.
+                </p>
+                <p class="L-what-text" style="margin-top:14px">
+                    VoiceBot answers <strong>every call, instantly</strong>. During lunch rushes, after hours, weekends, holidays. It books appointments, handles complaints, takes messages, creates tickets, and remembers returning callers.
+                </p>
             </div>
-            <div class="stat-item">
-                <h3>&lt;1s</h3>
-                <p>Average answer time</p>
-            </div>
-            <div class="stat-item">
-                <h3>30min</h3>
-                <p>Setup to live</p>
-            </div>
-            <div class="stat-item">
-                <h3>24/7</h3>
-                <p>Always available</p>
+            <div class="L-what-visual">
+                <svg viewBox="0 0 400 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="20" y="20" width="360" height="280" rx="16" fill="#fef2f2" stroke="#fecaca" stroke-width="1"/>
+                    <text x="40" y="52" font-family="DM Sans" font-size="12" font-weight="700" fill="#991b1b">Without an AI Receptionist</text>
+                    <rect x="60" y="80" width="36" height="180" rx="4" fill="#fecaca"/>
+                    <rect x="60" y="150" width="36" height="110" rx="4" fill="#dc2626"/>
+                    <text x="62" y="76" font-family="DM Sans" font-size="9" fill="#991b1b" font-weight="600">Mon</text>
+                    <rect x="110" y="80" width="36" height="180" rx="4" fill="#fecaca"/>
+                    <rect x="110" y="120" width="36" height="140" rx="4" fill="#dc2626"/>
+                    <text x="114" y="76" font-family="DM Sans" font-size="9" fill="#991b1b" font-weight="600">Tue</text>
+                    <rect x="160" y="80" width="36" height="180" rx="4" fill="#fecaca"/>
+                    <rect x="160" y="160" width="36" height="100" rx="4" fill="#dc2626"/>
+                    <text x="162" y="76" font-family="DM Sans" font-size="9" fill="#991b1b" font-weight="600">Wed</text>
+                    <rect x="210" y="80" width="36" height="180" rx="4" fill="#fecaca"/>
+                    <rect x="210" y="130" width="36" height="130" rx="4" fill="#dc2626"/>
+                    <text x="213" y="76" font-family="DM Sans" font-size="9" fill="#991b1b" font-weight="600">Thu</text>
+                    <rect x="260" y="80" width="36" height="180" rx="4" fill="#fecaca"/>
+                    <rect x="260" y="140" width="36" height="120" rx="4" fill="#dc2626"/>
+                    <text x="268" y="76" font-family="DM Sans" font-size="9" fill="#991b1b" font-weight="600">Fri</text>
+                    <rect x="170" y="270" width="10" height="10" rx="2" fill="#fecaca"/>
+                    <text x="186" y="279" font-family="DM Sans" font-size="9" fill="#991b1b">Total</text>
+                    <rect x="220" y="270" width="10" height="10" rx="2" fill="#dc2626"/>
+                    <text x="236" y="279" font-family="DM Sans" font-size="9" fill="#991b1b">Missed</text>
+                    <text x="310" y="110" font-family="Fraunces" font-size="24" font-weight="800" fill="#dc2626">Most</text>
+                    <text x="310" y="128" font-family="DM Sans" font-size="10" fill="#991b1b">calls missed</text>
+                </svg>
             </div>
         </div>
     </div>
 </section>
 
-<!-- ═══ TESTIMONIALS ═══ -->
-<section class="testimonials-section">
-    <div class="section-label">What Our Clients Say</div>
-    <h2 class="section-title">Businesses love their AI receptionist</h2>
-    <p class="section-subtitle">Real feedback from real business owners who switched to VoiceBot.</p>
+<!-- STATS -->
+<section class="L-section dark">
+    <div class="wrap">
+        <div class="L-center">
+            <div class="L-label L-dark-label">What's Included</div>
+            <h2 class="L-title" style="color:#fff">What you get out of the box</h2>
+            <p class="L-subtitle">From day one, your AI receptionist handles calls end-to-end</p>
+        </div>
+        <div class="L-stats">
+            <div class="L-stat"><h3>Every</h3><p>Call answered &mdash; day or night</p></div>
+            <div class="L-stat"><h3>Instant</h3><p>Pickup &mdash; no hold music</p></div>
+            <div class="L-stat"><h3>Auto</h3><p>Tickets, transcripts, analysis</p></div>
+            <div class="L-stat"><h3>24/7</h3><p>Always on, never sick</p></div>
+        </div>
+    </div>
+</section>
 
-    <div class="testimonials-grid">
-        <div class="testimonial-card">
-            <div class="testimonial-stars">★★★★★</div>
-            <p class="testimonial-text">"We were missing 40% of our calls during peak hours. VoiceBot now handles everything — enquiries, quotes, even complaint logging. Our customer satisfaction went up and we didn't hire a single extra person."</p>
-            <div class="testimonial-author">
-                <div class="testimonial-avatar">MR</div>
-                <div>
-                    <div class="testimonial-name">Mark Richardson</div>
-                    <div class="testimonial-role">Owner, Richardson Plumbing</div>
-                </div>
-            </div>
+<!-- HOW IT WORKS -->
+<section class="L-section alt" id="how">
+    <div class="wrap">
+        <div class="L-center">
+            <div class="L-label">How It Works</div>
+            <h2 class="L-title">Live in 30 minutes. No tech skills needed.</h2>
+            <p class="L-subtitle">Our AI interviewer sets everything up over a single phone call.</p>
         </div>
-        <div class="testimonial-card">
-            <div class="testimonial-stars">★★★★★</div>
-            <p class="testimonial-text">"The caller recognition feature is brilliant. When a patient calls back, the AI already knows their context. It's like having a receptionist with perfect memory. Our patients notice the difference."</p>
-            <div class="testimonial-author">
-                <div class="testimonial-avatar">SP</div>
-                <div>
-                    <div class="testimonial-name">Dr. Sarah Patel</div>
-                    <div class="testimonial-role">Director, Greenfield Dental</div>
-                </div>
+        <div class="L-steps">
+            <div class="L-step">
+                <div class="L-step-num">1</div>
+                <h3>Sign Up &amp; Tell Us About Your Business</h3>
+                <p>Create your account and give basic details. We call you and ask 8 short questions about services, hours, and how you want calls handled.</p>
             </div>
-        </div>
-        <div class="testimonial-card">
-            <div class="testimonial-stars">★★★★★</div>
-            <p class="testimonial-text">"I run a waste management company and we get hundreds of calls daily. VoiceBot categorises them automatically — skip hire bookings, complaints, price enquiries — all into neat tickets. Game changer."</p>
-            <div class="testimonial-author">
-                <div class="testimonial-avatar">JT</div>
-                <div>
-                    <div class="testimonial-name">James Turner</div>
-                    <div class="testimonial-role">MD, GreenWaste Solutions</div>
-                </div>
+            <div class="L-step">
+                <div class="L-step-num">2</div>
+                <h3>We Build Your Custom AI Agent</h3>
+                <p>Gemini AI processes your answers and creates a personalised receptionist with your greeting, business knowledge, FAQs, and escalation rules.</p>
+            </div>
+            <div class="L-step">
+                <div class="L-step-num">3</div>
+                <h3>Your Phone Goes Live</h3>
+                <p>We assign a dedicated number or forward your existing one. Calls are answered instantly, analysed in real-time, and logged in your dashboard.</p>
             </div>
         </div>
     </div>
 </section>
 
-<!-- ═══ PRICING ═══ -->
-<section class="pricing-section" id="pricing">
-    <div class="pricing-inner">
-        <div class="section-label">Pricing</div>
-        <h2 class="section-title">Simple, transparent pricing</h2>
-        <p class="section-subtitle">No hidden fees. No long contracts. Scale up or down anytime.</p>
+<!-- FEATURES -->
+<section class="L-section" id="features">
+    <div class="wrap">
+        <div class="L-center" style="margin-bottom:56px">
+            <div class="L-label">Features</div>
+            <h2 class="L-title">Not a chatbot. A complete digital employee.</h2>
+            <p class="L-subtitle">From natural conversations to automatic ticket creation &mdash; here's what your AI receptionist does.</p>
+        </div>
 
-        <div class="pricing-grid">
-            <div class="pricing-card">
-                <div class="pricing-tier">Starter</div>
-                <div class="pricing-price">£29<span>/mo</span></div>
-                <div class="pricing-desc">For small businesses getting started with AI call handling</div>
-                <ul class="pricing-features">
+        <div class="L-feat-row">
+            <div>
+                <div class="tag" style="background:var(--accent-light);color:var(--accent)">Core Feature</div>
+                <h3>Natural Voice Conversations Powered by Gemini AI</h3>
+                <p>Your receptionist understands context, handles multi-turn conversations, asks follow-ups, and responds naturally. Not a robotic IVR menu reading from a script.</p>
+                <p style="margin-top:12px;color:var(--text-2);font-size:.92rem">Handles questions like <strong>"I need a plumber Thursday 2-4pm for a leaking boiler in Leeds, what's your hourly rate?"</strong> &mdash; all in one exchange.</p>
+            </div>
+            <div class="L-feat-box">
+                <svg viewBox="0 0 340 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="20" y="20" width="300" height="200" rx="12" fill="white" stroke="#e0e4ed"/>
+                    <text x="36" y="46" font-family="DM Sans" font-size="10" font-weight="700" fill="#111827">Live Conversation</text>
+                    <circle cx="290" cy="40" r="6" fill="#059669"><animate attributeName="opacity" values="1;.3;1" dur="1.5s" repeatCount="indefinite"/></circle>
+                    <g transform="translate(40, 70)">
+                        <rect x="0" y="20" width="4" height="40" rx="2" fill="#2563eb"><animate attributeName="height" values="40;20;60;30;40" dur="1.2s" repeatCount="indefinite"/><animate attributeName="y" values="20;30;10;25;20" dur="1.2s" repeatCount="indefinite"/></rect>
+                        <rect x="10" y="10" width="4" height="60" rx="2" fill="#2563eb"><animate attributeName="height" values="60;40;20;50;60" dur="1s" repeatCount="indefinite"/><animate attributeName="y" values="10;20;30;15;10" dur="1s" repeatCount="indefinite"/></rect>
+                        <rect x="20" y="25" width="4" height="30" rx="2" fill="#2563eb"><animate attributeName="height" values="30;50;20;40;30" dur="1.4s" repeatCount="indefinite"/><animate attributeName="y" values="25;15;30;20;25" dur="1.4s" repeatCount="indefinite"/></rect>
+                        <rect x="30" y="5" width="4" height="70" rx="2" fill="#2563eb"><animate attributeName="height" values="70;30;50;60;70" dur=".9s" repeatCount="indefinite"/><animate attributeName="y" values="5;25;15;10;5" dur=".9s" repeatCount="indefinite"/></rect>
+                        <rect x="40" y="15" width="4" height="50" rx="2" fill="#93c5fd"><animate attributeName="height" values="50;70;30;40;50" dur="1.1s" repeatCount="indefinite"/><animate attributeName="y" values="15;5;25;20;15" dur="1.1s" repeatCount="indefinite"/></rect>
+                    </g>
+                    <rect x="36" y="160" width="140" height="20" rx="4" fill="#dbeafe"/>
+                    <text x="42" y="174" font-family="DM Sans" font-size="8" fill="#2563eb">"I need an appointment Thursday"</text>
+                    <rect x="160" y="185" width="120" height="20" rx="4" fill="#f0f2f7"/>
+                    <text x="166" y="199" font-family="DM Sans" font-size="8" fill="#4b5563">"Thursday at 2pm works great!"</text>
+                </svg>
+            </div>
+        </div>
+
+        <div class="L-feat-row reverse">
+            <div>
+                <div class="tag" style="background:var(--green-bg);color:var(--green)">Unique Feature</div>
+                <h3>Repeat Caller Recognition &mdash; Your AI Remembers Everyone</h3>
+                <p>When a customer calls back, the AI already knows them. Previous call summaries, sentiment, and outcomes are passed as context automatically.</p>
+                <p style="margin-top:12px;color:var(--text-2);font-size:.92rem">The AI says: <strong>"Welcome back! Last time you called about your boiler service. How can I help today?"</strong></p>
+            </div>
+            <div class="L-feat-box" style="background:var(--green-bg);border-color:rgba(5,150,105,.12)">
+                <svg viewBox="0 0 340 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="20" y="15" width="300" height="210" rx="12" fill="white" stroke="rgba(5,150,105,.15)"/>
+                    <text x="36" y="42" font-family="DM Sans" font-size="10" font-weight="700" fill="#111827">+44 7700 900 123</text>
+                    <text x="36" y="56" font-family="DM Sans" font-size="9" fill="#059669" font-weight="600">Returning &mdash; 2 previous calls</text>
+                    <rect x="36" y="70" width="268" height="44" rx="8" fill="#ecfdf5" stroke="rgba(5,150,105,.1)"/>
+                    <text x="48" y="88" font-family="DM Sans" font-size="9" font-weight="600" fill="#065f46">Call #1 &mdash; Jan 15</text>
+                    <text x="48" y="102" font-family="DM Sans" font-size="8" fill="#4b5563">Boiler enquiry &middot; Positive &middot; Booked</text>
+                    <rect x="36" y="120" width="268" height="44" rx="8" fill="#ecfdf5" stroke="rgba(5,150,105,.1)"/>
+                    <text x="48" y="138" font-family="DM Sans" font-size="9" font-weight="600" fill="#065f46">Call #2 &mdash; Feb 3</text>
+                    <text x="48" y="152" font-family="DM Sans" font-size="8" fill="#4b5563">Follow-up &middot; Happy &middot; Left review</text>
+                    <text x="120" y="186" font-family="DM Sans" font-size="9" fill="#059669" font-weight="600">Context passed to AI</text>
+                    <rect x="60" y="194" width="220" height="22" rx="6" fill="#059669"/>
+                    <text x="72" y="209" font-family="DM Sans" font-size="9" fill="white">"Welcome back! How was the service?"</text>
+                </svg>
+            </div>
+        </div>
+
+        <div class="L-feat-row">
+            <div>
+                <div class="tag" style="background:var(--orange-bg);color:var(--orange)">Automation</div>
+                <h3>Automatic Ticket Creation From Every Call</h3>
+                <p>After each call, Gemini AI analyses the transcript and extracts: caller intent, category, sentiment, action items, and urgency. A ticket is created automatically with zero manual work.</p>
+                <p style="margin-top:12px;color:var(--text-2);font-size:.92rem">Open your dashboard, see 12 tickets neatly categorised from overnight calls, prioritised by urgency. Act on what matters.</p>
+            </div>
+            <div class="L-feat-box" style="background:var(--orange-bg);border-color:rgba(217,119,6,.12)">
+                <svg viewBox="0 0 340 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="10" y="10" width="320" height="220" rx="12" fill="white" stroke="rgba(217,119,6,.15)"/>
+                    <text x="26" y="36" font-family="DM Sans" font-size="10" font-weight="700" fill="#111827">Auto-Generated Tickets</text>
+                    <rect x="26" y="50" width="288" height="44" rx="8" fill="#fef2f2" stroke="rgba(220,38,38,.1)"/>
+                    <text x="38" y="68" font-family="DM Sans" font-size="9" font-weight="700" fill="#dc2626">URGENT</text>
+                    <text x="86" y="68" font-family="DM Sans" font-size="9" font-weight="600" fill="#111827">Burst pipe &mdash; emergency</text>
+                    <text x="38" y="82" font-family="DM Sans" font-size="8" fill="#6b7280">Mrs. Thompson &middot; 2 min ago &middot; Anxious</text>
+                    <rect x="26" y="100" width="288" height="44" rx="8" fill="#fffbeb" stroke="rgba(217,119,6,.1)"/>
+                    <text x="38" y="118" font-family="DM Sans" font-size="9" font-weight="700" fill="#d97706">HIGH</text>
+                    <text x="72" y="118" font-family="DM Sans" font-size="9" font-weight="600" fill="#111827">Quote &mdash; bathroom refit</text>
+                    <text x="38" y="132" font-family="DM Sans" font-size="8" fill="#6b7280">Mr. Patel &middot; 18 min ago &middot; Positive</text>
+                    <rect x="26" y="150" width="288" height="44" rx="8" fill="#f0f2f7" stroke="#e0e4ed"/>
+                    <text x="38" y="168" font-family="DM Sans" font-size="9" font-weight="700" fill="#2563eb">NORMAL</text>
+                    <text x="96" y="168" font-family="DM Sans" font-size="9" font-weight="600" fill="#111827">Annual boiler service</text>
+                    <text x="38" y="182" font-family="DM Sans" font-size="8" fill="#6b7280">Mr. Davis &middot; 45 min ago &middot; Neutral</text>
+                    <rect x="26" y="202" width="288" height="22" rx="4" fill="#f0f2f7"/>
+                    <text x="100" y="216" font-family="DM Sans" font-size="9" font-weight="600" fill="#4b5563">3 tickets &middot; 1 urgent &middot; 0 unresolved</text>
+                </svg>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CAPABILITIES -->
+<section class="L-section alt">
+    <div class="wrap">
+        <div class="L-center" style="margin-bottom:12px">
+            <div class="L-label">Everything Included</div>
+            <h2 class="L-title">One subscription. Every capability.</h2>
+        </div>
+        <div class="L-caps">
+            <div class="L-cap">
+                <div class="L-cap-icon b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg></div>
+                <h4>Natural Voice AI</h4>
+                <p>Human-like conversations. Understands context, accents, and complex multi-part questions.</p>
+            </div>
+            <div class="L-cap">
+                <div class="L-cap-icon g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+                <h4>24/7 Availability</h4>
+                <p>Business hours routing, after-hours voicemail, holiday mode. No overtime costs.</p>
+            </div>
+            <div class="L-cap">
+                <div class="L-cap-icon p"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg></div>
+                <h4>Full Transcription</h4>
+                <p>Every call recorded, transcribed, analysed. Summaries, sentiment, intent, action items.</p>
+            </div>
+            <div class="L-cap">
+                <div class="L-cap-icon o"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+                <h4>Knowledge Base</h4>
+                <p>Upload FAQs, service details, policies. The AI gives accurate answers every time.</p>
+            </div>
+            <div class="L-cap">
+                <div class="L-cap-icon r"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72"/></svg></div>
+                <h4>Smart Call Transfer</h4>
+                <p>Seamless handoff to humans with full context when the AI reaches its limits.</p>
+            </div>
+            <div class="L-cap">
+                <div class="L-cap-icon b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2"/><circle cx="12" cy="12" r="3"/></svg></div>
+                <h4>AI Onboarding Interview</h4>
+                <p>We call you, ask 8 questions, build your agent. No forms, no complexity.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- INDUSTRIES -->
+<section class="L-section">
+    <div class="wrap">
+        <div class="L-center" style="margin-bottom:12px">
+            <div class="L-label">Built for Your Industry</div>
+            <h2 class="L-title">Pre-configured for businesses that rely on calls</h2>
+            <p class="L-subtitle">Type any business type you want during signup &mdash; no locked dropdowns.</p>
+        </div>
+        <div class="L-ind-grid">
+            <div class="L-ind"><div class="L-ind-icon" style="background:#dbeafe">&#128295;</div><h4>Plumbing &amp; HVAC</h4><p>Emergency dispatch, quotes</p></div>
+            <div class="L-ind"><div class="L-ind-icon" style="background:#ecfdf5">&#129463;</div><h4>Dental &amp; Medical</h4><p>Patient intake, appointments</p></div>
+            <div class="L-ind"><div class="L-ind-icon" style="background:#fffbeb">&#127869;</div><h4>Restaurants</h4><p>Reservations, orders, events</p></div>
+            <div class="L-ind"><div class="L-ind-icon" style="background:#f5f3ff">&#9878;</div><h4>Legal &amp; Solicitors</h4><p>Lead qualify, scheduling</p></div>
+            <div class="L-ind"><div class="L-ind-icon" style="background:#fef2f2">&#129529;</div><h4>Cleaning Services</h4><p>Instant quotes, bookings</p></div>
+            <div class="L-ind"><div class="L-ind-icon" style="background:#ecfdf5">&#127959;</div><h4>Construction</h4><p>Job enquiries, site scheduling</p></div>
+            <div class="L-ind"><div class="L-ind-icon" style="background:#dbeafe">&#128465;</div><h4>Waste Management</h4><p>Skip hire, complaints, routing</p></div>
+            <div class="L-ind"><div class="L-ind-icon" style="background:#fffbeb">&#128135;</div><h4>Salons &amp; Wellness</h4><p>Bookings, upsells</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- COMPARISON -->
+<section class="L-section alt">
+    <div class="wrap">
+        <div class="L-center" style="margin-bottom:12px">
+            <div class="L-label">VoiceBot vs The Rest</div>
+            <h2 class="L-title">Why businesses switch to VoiceBot</h2>
+        </div>
+        <table class="L-compare">
+            <thead><tr><th>Feature</th><th>VoiceBot</th><th>Human Receptionist</th><th>Basic IVR</th></tr></thead>
+            <tbody>
+                <tr><td>Instant call pickup</td><td class="yes">Automated</td><td class="no">Depends on staff</td><td class="no">Menu only</td></tr>
+                <tr><td>24/7 availability</td><td class="yes">Always</td><td class="no">Shifts only</td><td class="yes">Records only</td></tr>
+                <tr><td>Parallel calls</td><td class="yes">Multiple</td><td class="no">1 at a time</td><td class="no">Queues</td></tr>
+                <tr><td>Remembers callers</td><td class="yes">Automatic</td><td class="no">Sometimes</td><td class="no">Never</td></tr>
+                <tr><td>Auto ticket creation</td><td class="yes">AI-powered</td><td class="no">Manual</td><td class="no">None</td></tr>
+                <tr><td>Sentiment analysis</td><td class="yes">Per-call</td><td class="no">Subjective</td><td class="no">None</td></tr>
+                <tr><td>Cost</td><td class="yes">Low monthly fee</td><td class="no">Full salary</td><td class="no">Limited value</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="L-section">
+    <div class="wrap">
+        <div class="L-center" style="margin-bottom:12px">
+            <div class="L-label">Use Cases</div>
+            <h2 class="L-title">How businesses use VoiceBot</h2>
+        </div>
+        <div class="L-testi-grid">
+            <div class="L-testi">
+                <div class="L-testi-metric">Plumbing</div>
+                <div class="L-testi-metric-label">Emergency &amp; scheduled calls</div>
+                <p class="L-testi-text">AI triages emergency vs routine calls, collects job details (location, issue type, urgency), creates prioritised tickets, and can transfer emergencies to an on-call number immediately.</p>
+                <div class="L-testi-author"><div class="L-testi-av" style="background:var(--accent-light);color:var(--accent)">&#128295;</div><div><div class="L-testi-name">Trade &amp; Home Services</div><div class="L-testi-role">Plumbing, HVAC, Electrical</div></div></div>
+            </div>
+            <div class="L-testi">
+                <div class="L-testi-metric">Dental</div>
+                <div class="L-testi-metric-label">Patient intake &amp; scheduling</div>
+                <p class="L-testi-text">Handles new patient enquiries, collects basic details, answers questions about services and opening hours, and logs everything as a ticket for your reception team to follow up.</p>
+                <div class="L-testi-author"><div class="L-testi-av" style="background:var(--green-bg);color:var(--green)">&#129463;</div><div><div class="L-testi-name">Healthcare &amp; Dental</div><div class="L-testi-role">Clinics, Practices, Surgeries</div></div></div>
+            </div>
+            <div class="L-testi">
+                <div class="L-testi-metric">Waste</div>
+                <div class="L-testi-metric-label">High-volume call handling</div>
+                <p class="L-testi-text">Manages skip hire enquiries, missed collection complaints, pricing questions, and service area checks. Categorises each call automatically so your ops team sees clear priorities.</p>
+                <div class="L-testi-author"><div class="L-testi-av" style="background:var(--orange-bg);color:var(--orange)">&#128465;</div><div><div class="L-testi-name">Waste Management</div><div class="L-testi-role">Skip hire, Collections, Recycling</div></div></div>
+            </div>
+            <div class="L-testi">
+                <div class="L-testi-metric">Legal</div>
+                <div class="L-testi-metric-label">Lead qualification &amp; intake</div>
+                <p class="L-testi-text">Qualifies potential clients by collecting case type, urgency, and basic details. After-hours callers get professional handling instead of voicemail, with full context ready for morning review.</p>
+                <div class="L-testi-author"><div class="L-testi-av" style="background:var(--purple-bg);color:var(--purple)">&#9878;</div><div><div class="L-testi-name">Legal &amp; Professional</div><div class="L-testi-role">Solicitors, Accountants, Consultants</div></div></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- PRICING -->
+<section class="L-section alt" id="pricing">
+    <div class="wrap">
+        <div class="L-center" style="margin-bottom:12px">
+            <div class="L-label">Pricing</div>
+            <h2 class="L-title">Simple pricing. No hidden fees.</h2>
+            <p class="L-subtitle">Start free. Scale when ready. Cancel anytime.</p>
+        </div>
+        <div class="L-pricing">
+            <div class="L-price-card">
+                <div class="L-price-tier">Starter</div>
+                <div class="L-price-amt">&pound;29<span>/mo</span></div>
+                <div class="L-price-desc">For small businesses getting started</div>
+                <ul class="L-price-list">
                     <li>200 minutes/month</li>
                     <li>1 phone number</li>
-                    <li>Call recording & transcription</li>
+                    <li>Recording &amp; transcription</li>
                     <li>Automatic ticketing</li>
                     <li>Knowledge base</li>
-                    <li>Dashboard & call analytics</li>
+                    <li>Dashboard &amp; analytics</li>
                 </ul>
-                <a href="{{ url_for('register') }}" class="btn btn-secondary pricing-cta">Start Free Trial</a>
+                <a href="{{ url_for('register') }}" class="btn btn-secondary btn-block">Start Free Trial</a>
             </div>
-            <div class="pricing-card featured">
-                <div class="pricing-tier">Growth</div>
-                <div class="pricing-price">£79<span>/mo</span></div>
-                <div class="pricing-desc">For growing businesses with higher call volumes</div>
-                <ul class="pricing-features">
+            <div class="L-price-card pop">
+                <div class="L-price-tier">Growth</div>
+                <div class="L-price-amt">&pound;79<span>/mo</span></div>
+                <div class="L-price-desc">For busy businesses</div>
+                <ul class="L-price-list">
                     <li>600 minutes/month</li>
                     <li>2 phone numbers</li>
                     <li>Everything in Starter</li>
-                    <li>Caller recognition & history</li>
+                    <li>Caller recognition</li>
                     <li>Sentiment analysis</li>
-                    <li>SMS notifications & alerts</li>
+                    <li>SMS notifications</li>
                     <li>Priority support</li>
                 </ul>
-                <a href="{{ url_for('register') }}" class="btn btn-primary pricing-cta">Start Free Trial</a>
+                <a href="{{ url_for('register') }}" class="btn btn-primary btn-block">Start Free Trial</a>
             </div>
-            <div class="pricing-card">
-                <div class="pricing-tier">Enterprise</div>
-                <div class="pricing-price">£199<span>/mo</span></div>
-                <div class="pricing-desc">For high-volume operations and multi-location businesses</div>
-                <ul class="pricing-features">
+            <div class="L-price-card">
+                <div class="L-price-tier">Enterprise</div>
+                <div class="L-price-amt">&pound;199<span>/mo</span></div>
+                <div class="L-price-desc">Multi-location &amp; high-volume</div>
+                <ul class="L-price-list">
                     <li>2,000 minutes/month</li>
                     <li>5 phone numbers</li>
                     <li>Everything in Growth</li>
@@ -238,88 +457,76 @@
                     <li>White-label option</li>
                     <li>Dedicated account manager</li>
                 </ul>
-                <a href="{{ url_for('register') }}" class="btn btn-secondary pricing-cta">Contact Sales</a>
+                <a href="{{ url_for('register') }}" class="btn btn-secondary btn-block">Contact Sales</a>
             </div>
         </div>
     </div>
 </section>
 
-<!-- ═══ FAQ ═══ -->
-<section class="faq-section" id="faq">
-    <div class="section-label">FAQ</div>
-    <h2 class="section-title">Frequently asked questions</h2>
-    <p class="section-subtitle">Everything you need to know before getting started.</p>
-
-    <div class="faq-item">
-        <div class="faq-question">How does the AI receptionist actually work?</div>
-        <div class="faq-answer">When someone calls your VoiceBot number, Twilio routes the call to our platform. Google's Gemini AI processes the caller's speech in real-time, generates natural responses based on your business configuration, and handles the conversation. Every call is recorded, transcribed, and analysed automatically.</div>
-    </div>
-    <div class="faq-item">
-        <div class="faq-question">Can it handle complex questions specific to my business?</div>
-        <div class="faq-answer">Yes. During onboarding, you provide details about your services, policies, and common questions. You can also add documents to the knowledge base at any time. The AI references this information during calls to give accurate, business-specific answers.</div>
-    </div>
-    <div class="faq-item">
-        <div class="faq-question">What happens if the AI can't help a caller?</div>
-        <div class="faq-answer">You set a transfer number during setup. When the AI detects it can't resolve an issue, or when the caller requests a human, the call is seamlessly transferred to your designated number. After hours, callers can leave a voicemail.</div>
-    </div>
-    <div class="faq-item">
-        <div class="faq-question">How does caller recognition work?</div>
-        <div class="faq-answer">When a call comes in, the system checks the caller's phone number against your previous calls. If they've called before, the last 2 call summaries (including category and sentiment) are passed to the AI as context. This allows the agent to say things like "Welcome back — I see you called about a delivery issue last time."</div>
-    </div>
-    <div class="faq-item">
-        <div class="faq-question">Can I use my existing business phone number?</div>
-        <div class="faq-answer">We can port your existing number or set up call forwarding. Alternatively, we provide dedicated numbers in the UK, US, and Australia. Contact us to discuss your specific setup.</div>
-    </div>
-    <div class="faq-item">
-        <div class="faq-question">What happens when I go over my minute limit?</div>
-        <div class="faq-answer">You'll receive SMS alerts at 80%, 90%, and 100% usage. Overage is billed at £0.08/min. Your AI receptionist keeps working — we never cut off your service mid-month.</div>
-    </div>
-    <div class="faq-item">
-        <div class="faq-question">Is my data secure?</div>
-        <div class="faq-answer">All data is encrypted in transit and at rest. Call recordings are stored securely and only accessible through your authenticated dashboard. We comply with GDPR and Australian Privacy Principles.</div>
+<!-- FAQ -->
+<section class="L-section" id="faq">
+    <div class="wrap">
+        <div class="L-center" style="margin-bottom:12px">
+            <div class="L-label">FAQ</div>
+            <h2 class="L-title">Common questions, straight answers</h2>
+        </div>
+        <div class="L-faq">
+            <div class="L-faq-item open">
+                <div class="L-faq-q" onclick="this.parentElement.classList.toggle('open')">How does the AI receptionist work?</div>
+                <div class="L-faq-a">Twilio routes calls to our platform. Gemini AI processes speech in real-time, generates responses from your business config, and handles the full conversation. Every call is recorded, transcribed, and analysed. Tickets are auto-created.</div>
+            </div>
+            <div class="L-faq-item">
+                <div class="L-faq-q" onclick="this.parentElement.classList.toggle('open')">Will customers know it's AI?</div>
+                <div class="L-faq-a">Most don't notice. The voice is natural and context-aware. We recommend transparency: the AI identifies itself if asked directly.</div>
+            </div>
+            <div class="L-faq-item">
+                <div class="L-faq-q" onclick="this.parentElement.classList.toggle('open')">What if the AI can't help?</div>
+                <div class="L-faq-a">It transfers seamlessly to your designated number with full context. After hours, callers leave voicemails that get transcribed and ticketed automatically.</div>
+            </div>
+            <div class="L-faq-item">
+                <div class="L-faq-q" onclick="this.parentElement.classList.toggle('open')">Can I keep my existing phone number?</div>
+                <div class="L-faq-a">Yes. Set up call forwarding from your existing number, or we provide a new dedicated number in the UK, US, or Australia.</div>
+            </div>
+            <div class="L-faq-item">
+                <div class="L-faq-q" onclick="this.parentElement.classList.toggle('open')">How does caller recognition work?</div>
+                <div class="L-faq-a">The system checks the phone number against previous calls. If they've called before, the last 2 summaries are passed to the AI as context for personalised service.</div>
+            </div>
+            <div class="L-faq-item">
+                <div class="L-faq-q" onclick="this.parentElement.classList.toggle('open')">Is my data secure?</div>
+                <div class="L-faq-a">All data encrypted in transit and at rest. GDPR compliant. You own your data. Recordings only accessible through your authenticated dashboard.</div>
+            </div>
+            <div class="L-faq-item">
+                <div class="L-faq-q" onclick="this.parentElement.classList.toggle('open')">What happens if I exceed my minutes?</div>
+                <div class="L-faq-a">You'll get alerts as you approach your limit. Overage is billed at a per-minute rate based on your plan. We never cut off your service mid-month.</div>
+            </div>
+        </div>
     </div>
 </section>
 
-<!-- ═══ CTA BANNER ═══ -->
-<section class="cta-section">
-    <div class="cta-inner">
-        <h2>Ready to stop missing calls?</h2>
-        <p>Join hundreds of businesses using VoiceBot to handle their calls professionally, 24/7. Set up takes less than 30 minutes and there's no long-term commitment.</p>
-        <a href="{{ url_for('register') }}" class="cta-btn">Start Your Free Trial →</a>
+<!-- CTA -->
+<section class="L-section dark">
+    <div class="wrap">
+        <div class="L-cta">
+            <h2>Stop missing calls.<br>Start closing more deals.</h2>
+            <p>Setup takes 30 minutes. No long-term commitment. Your AI receptionist starts working from day one.</p>
+            <a href="{{ url_for('register') }}" class="btn btn-lg btn-white">Start Your Free Trial &rarr;</a>
+        </div>
     </div>
 </section>
 
-<!-- ═══ FOOTER ═══ -->
-<footer class="landing-footer">
-    <div class="footer-grid">
-        <div>
-            <div class="footer-brand"><span class="brand-dot"></span> VoiceBot</div>
-            <p class="footer-desc">AI-powered voice receptionist for businesses that care about every customer call. Built with Gemini AI and Twilio telephony.</p>
+<!-- FOOTER -->
+<footer class="L-footer">
+    <div class="wrap">
+        <div class="L-footer-grid">
+            <div>
+                <div class="L-footer-brand"><span class="L-brand-dot"></span> VoiceBot</div>
+                <p class="L-footer-desc">AI-powered voice receptionist for businesses that care about every call. Built with Google Gemini AI and Twilio telephony.</p>
+            </div>
+            <div class="L-footer-col"><h4>Product</h4><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#how">How It Works</a><a href="#faq">FAQ</a></div>
+            <div class="L-footer-col"><h4>Company</h4><a href="#">About</a><a href="#">Blog</a><a href="#">Contact</a><a href="#">Careers</a></div>
+            <div class="L-footer-col"><h4>Legal</h4><a href="#">Privacy Policy</a><a href="#">Terms</a><a href="#">GDPR</a><a href="#">Cookies</a></div>
         </div>
-        <div class="footer-col">
-            <h4>Product</h4>
-            <a href="#features">Features</a>
-            <a href="#pricing">Pricing</a>
-            <a href="#how-it-works">How It Works</a>
-            <a href="#faq">FAQ</a>
-        </div>
-        <div class="footer-col">
-            <h4>Company</h4>
-            <a href="#">About Us</a>
-            <a href="#">Blog</a>
-            <a href="#">Careers</a>
-            <a href="#">Contact</a>
-        </div>
-        <div class="footer-col">
-            <h4>Legal</h4>
-            <a href="#">Privacy Policy</a>
-            <a href="#">Terms of Service</a>
-            <a href="#">GDPR</a>
-            <a href="#">Cookie Policy</a>
-        </div>
-    </div>
-    <div class="footer-bottom">
-        © 2026 VoiceBot. All rights reserved. Built for DevDash 2026.
+        <div class="L-footer-bottom">&copy; 2026 VoiceBot. All rights reserved.</div>
     </div>
 </footer>
 
