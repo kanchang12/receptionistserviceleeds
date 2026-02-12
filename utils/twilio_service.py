@@ -78,6 +78,19 @@ def update_webhooks(twilio_sid):
         return False
 
 
+def set_call_status_callback(call_sid):
+    """Set status callback on an in-progress call so we get notified when it ends."""
+    try:
+        get_client().calls(call_sid).update(
+            status_callback=f"{APP_BASE_URL}/webhook/call-status",
+            status_callback_method='POST',
+            status_callback_event=['completed', 'busy', 'no-answer', 'canceled', 'failed'])
+        return True
+    except Exception as e:
+        print(f"[Twilio] set_call_status_callback error: {e}")
+        return False
+
+
 def list_numbers():
     try:
         return [{'sid': n.sid, 'number': n.phone_number, 'friendly_name': n.friendly_name}
