@@ -1,13 +1,12 @@
 """
 VoiceBot SaaS Platform
 Twilio telephony + Gemini AI backbone
-Flask + PostgreSQL + Redis + Gunicorn
+Flask + PostgreSQL + Gunicorn
 """
 
 import os
 import json
 import math
-import redis
 import psycopg2
 import psycopg2.extras
 from datetime import datetime, timedelta
@@ -88,45 +87,26 @@ def insert_db(sql, params=None):
         conn.close()
 
 
-# ─── REDIS ─────────────────────────────────
-
-REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
-try:
-    rds = redis.from_url(REDIS_URL, decode_responses=True)
-    rds.ping()
-except Exception:
-    rds = None
-    print("[WARN] Redis not available, using in-memory fallback")
+# ─── IN-MEMORY CACHE ──────────────────────
+# Stores conversation state during live calls. No external dependency needed.
 
 _mem_store = {}
 
 
 def cache_set(key, value, ex=3600):
-    if rds:
-        rds.set(key, json.dumps(value) if isinstance(value, (dict, list)) else str(value), ex=ex)
-    else:
-        _mem_store[key] = value
+    _mem_store[key] = value
 
 
 def cache_get(key, as_json=False):
-    if rds:
-        val = rds.get(key)
-        if val and as_json:
-            return json.loads(val)
-        return val
     return _mem_store.get(key)
 
 
 def cache_incr(key):
-    if rds:
-        return rds.incr(key)
     _mem_store[key] = _mem_store.get(key, 0) + 1
     return _mem_store[key]
 
 
 def cache_decr(key):
-    if rds:
-        return rds.decr(key)
     _mem_store[key] = max(0, _mem_store.get(key, 0) - 1)
     return _mem_store[key]
 
