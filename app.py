@@ -373,7 +373,7 @@ def client_dashboard():
         "SELECT * FROM calls WHERE business_id=%s ORDER BY created_at DESC LIMIT 10", (biz_id,))
     open_tickets = query_db(
         "SELECT * FROM tickets WHERE business_id=%s AND status IN ('open','in_progress') ORDER BY created_at DESC LIMIT 10", (biz_id,))
-    phone = query_db("SELECT * FROM phone_numbers WHERE business_id=%s AND status='assigned' LIMIT 1", (biz_id,), one=True)
+    phone_numbers = query_db("SELECT * FROM phone_numbers WHERE business_id=%s AND status='assigned'", (biz_id,))
 
     # Stats
     today = datetime.now().date()
@@ -381,12 +381,45 @@ def client_dashboard():
         "SELECT COUNT(*) as cnt FROM calls WHERE business_id=%s AND created_at::date=%s",
         (biz_id, today), one=True)
     active_calls = int(cache_get(f"active_calls:{biz_id}") or 0)
+    total_calls = query_db(
+        "SELECT COUNT(*) as cnt FROM calls WHERE business_id=%s", (biz_id,), one=True)
+
+    # Category breakdown
+    categories = query_db(
+        "SELECT category, COUNT(*) as cnt FROM calls WHERE business_id=%s GROUP BY category ORDER BY cnt DESC",
+        (biz_id,))
+
+    # Sentiment breakdown
+    sentiments = query_db(
+        "SELECT sentiment, COUNT(*) as cnt FROM calls WHERE business_id=%s GROUP BY sentiment ORDER BY cnt DESC",
+        (biz_id,))
+
+    # Status breakdown
+    statuses = query_db(
+        "SELECT status, COUNT(*) as cnt FROM calls WHERE business_id=%s GROUP BY status ORDER BY cnt DESC",
+        (biz_id,))
+
+    # Calls per day (last 7 days)
+    daily_calls = query_db("""
+        SELECT created_at::date as day, COUNT(*) as cnt
+        FROM calls WHERE business_id=%s AND created_at > NOW() - INTERVAL '7 days'
+        GROUP BY created_at::date ORDER BY day
+    """, (biz_id,))
+
+    # Avg duration
+    avg_duration = query_db(
+        "SELECT AVG(duration_seconds) as avg_dur FROM calls WHERE business_id=%s AND status='completed'",
+        (biz_id,), one=True)
 
     return render_template('client/dashboard.html',
                            business=biz, usage=usage, calls=recent_calls,
-                           tickets=open_tickets, phone=phone,
+                           tickets=open_tickets, phone_numbers=phone_numbers,
                            today_calls=today_calls['cnt'] if today_calls else 0,
-                           active_calls=active_calls, tier_limits=TIER_LIMITS)
+                           total_calls=total_calls['cnt'] if total_calls else 0,
+                           active_calls=active_calls, tier_limits=TIER_LIMITS,
+                           categories=categories or [], sentiments=sentiments or [],
+                           statuses=statuses or [], daily_calls=daily_calls or [],
+                           avg_duration=avg_duration['avg_dur'] if avg_duration and avg_duration['avg_dur'] else 0)
 
 
 @app.route('/dashboard/calls')
@@ -758,6 +791,9 @@ def webhook_incoming_call():
     # Track active calls
     cache_incr(f"active_calls:{biz_id}")
 
+    # Ensure we get notified when call ends (critical for analysis)
+    twilio_service.set_call_status_callback(call_sid)
+
     # Start recording
     twilio_service.start_recording(call_sid)
 
@@ -899,70 +935,85 @@ def webhook_call_status():
     call_sid = request.values.get('CallSid', '')
     status = request.values.get('CallStatus', '')
     duration = int(request.values.get('CallDuration', 0) or 0)
+    print(f"[call-status] SID={call_sid} Status={status} Duration={duration}")
 
     if status == 'completed':
         call = query_db("SELECT * FROM calls WHERE twilio_call_sid=%s", (call_sid,), one=True)
-        if call:
-            biz_id = str(call['business_id'])
+        if not call:
+            print(f"[call-status] No call record found for {call_sid}")
+            return '', 204
 
-            # Always update status first — no matter what happens next
-            execute_db("""UPDATE calls SET status='completed', duration_seconds=%s, completed_at=NOW()
-                          WHERE twilio_call_sid=%s""", (duration, call_sid))
+        biz_id = str(call['business_id'])
 
-            try:
-                # Get conversation log from cache or DB
-                conv_log = cache_get(f"conv:{call_sid}", as_json=True) or []
-                if not conv_log and call.get('conversation_log'):
-                    conv_log = safe_json(call['conversation_log'], [])
+        # Always update status first — no matter what happens next
+        execute_db("""UPDATE calls SET status='completed', duration_seconds=%s, completed_at=NOW()
+                      WHERE twilio_call_sid=%s""", (duration, call_sid))
+        print(f"[call-status] Status set to completed for {call_sid}")
 
-                # Get recording URL
-                recording_url = twilio_service.get_recording_url(call_sid)
+        try:
+            # Get conversation log from cache or DB
+            conv_log = cache_get(f"conv:{call_sid}", as_json=True) or []
+            if not conv_log and call.get('conversation_log'):
+                conv_log = safe_json(call['conversation_log'], [])
+            print(f"[call-status] Conv log has {len(conv_log)} entries")
 
-                # Analyze call with Gemini
-                biz = query_db("SELECT * FROM businesses WHERE id=%s", (biz_id,), one=True)
-                analysis = None
-                if recording_url and biz:
-                    analysis = gemini_service.analyze_call_recording(
-                        recording_url, biz['name'], biz.get('business_type', ''))
-                elif conv_log and biz:
-                    transcript = "\n".join(f"{e['role']}: {e['text']}" for e in conv_log)
-                    analysis = gemini_service.analyze_call_transcript(
-                        transcript, biz['name'], biz.get('business_type', ''))
+            # Get recording URL
+            recording_url = twilio_service.get_recording_url(call_sid)
+            print(f"[call-status] Recording URL: {recording_url}")
 
-                if analysis:
-                    execute_db("""UPDATE calls SET recording_url=%s, transcript=%s, summary=%s,
-                                  category=%s, sentiment=%s, caller_intent=%s, resolution=%s,
-                                  action_items=%s, conversation_log=%s
-                                  WHERE twilio_call_sid=%s""",
-                               (recording_url,
-                                analysis.get('transcript', ''), analysis.get('summary', ''),
-                                analysis.get('category', 'other'), analysis.get('sentiment', 'neutral'),
-                                analysis.get('caller_intent', ''), analysis.get('resolution', 'unresolved'),
-                                json.dumps(analysis.get('action_items', [])), json.dumps(conv_log),
-                                call_sid))
+            # Analyze call with Gemini
+            biz = query_db("SELECT * FROM businesses WHERE id=%s", (biz_id,), one=True)
+            analysis = None
+            if recording_url and biz:
+                print(f"[call-status] Analyzing via recording...")
+                analysis = gemini_service.analyze_call_recording(
+                    recording_url, biz['name'], biz.get('business_type', ''))
+            elif conv_log and biz:
+                print(f"[call-status] Analyzing via transcript...")
+                transcript = "\n".join(f"{e['role']}: {e['text']}" for e in conv_log)
+                analysis = gemini_service.analyze_call_transcript(
+                    transcript, biz['name'], biz.get('business_type', ''))
+            else:
+                print(f"[call-status] No recording and no conv_log — cannot analyze")
 
-                    # Auto-create ticket if needed
-                    if analysis.get('should_create_ticket') and analysis.get('ticket_data'):
-                        td = analysis['ticket_data']
-                        execute_db("""INSERT INTO tickets (business_id, call_id, type, priority, subject,
-                                      description, caller_name, caller_number)
-                                      VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
-                                   (biz_id, str(call['id']), td.get('type', 'enquiry'),
-                                    td.get('priority', 'normal'), td.get('subject', 'New ticket'),
-                                    td.get('description', ''), td.get('caller_name', ''),
-                                    call.get('caller_number', '')))
-                else:
-                    execute_db("""UPDATE calls SET recording_url=%s, conversation_log=%s
-                                  WHERE twilio_call_sid=%s""",
-                               (recording_url or '', json.dumps(conv_log), call_sid))
-            except Exception as e:
-                print(f"[call-status] Analysis error for {call_sid}: {e}")
+            if analysis:
+                print(f"[call-status] Analysis done: category={analysis.get('category')}, sentiment={analysis.get('sentiment')}")
+                execute_db("""UPDATE calls SET recording_url=%s, transcript=%s, summary=%s,
+                              category=%s, sentiment=%s, caller_intent=%s, resolution=%s,
+                              action_items=%s, conversation_log=%s
+                              WHERE twilio_call_sid=%s""",
+                           (recording_url,
+                            analysis.get('transcript', ''), analysis.get('summary', ''),
+                            analysis.get('category', 'other'), analysis.get('sentiment', 'neutral'),
+                            analysis.get('caller_intent', ''), analysis.get('resolution', 'unresolved'),
+                            json.dumps(analysis.get('action_items', [])), json.dumps(conv_log),
+                            call_sid))
 
-            # Update minutes
-            add_call_minutes(biz_id, duration)
+                # Auto-create ticket if needed
+                if analysis.get('should_create_ticket') and analysis.get('ticket_data'):
+                    td = analysis['ticket_data']
+                    execute_db("""INSERT INTO tickets (business_id, call_id, type, priority, subject,
+                                  description, caller_name, caller_number)
+                                  VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+                               (biz_id, str(call['id']), td.get('type', 'enquiry'),
+                                td.get('priority', 'normal'), td.get('subject', 'New ticket'),
+                                td.get('description', ''), td.get('caller_name', ''),
+                                call.get('caller_number', '')))
+            else:
+                print(f"[call-status] Analysis returned None")
+                execute_db("""UPDATE calls SET recording_url=%s, conversation_log=%s
+                              WHERE twilio_call_sid=%s""",
+                           (recording_url or '', json.dumps(conv_log), call_sid))
+        except Exception as e:
+            print(f"[call-status] Analysis error for {call_sid}: {e}")
+            import traceback
+            traceback.print_exc()
 
-            # Decrement active calls
-            cache_decr(f"active_calls:{biz_id}")
+        # Update minutes
+        add_call_minutes(biz_id, duration)
+
+        # Decrement active calls
+        cache_decr(f"active_calls:{biz_id}")
         else:
             # No call record found — still try to mark it
             execute_db("""UPDATE calls SET status='completed', duration_seconds=%s, completed_at=NOW()
