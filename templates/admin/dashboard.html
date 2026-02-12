@@ -3,7 +3,6 @@
 {% block content %}
 <div class="page-header">
     <h1>Admin Dashboard</h1>
-    <p>Platform overview</p>
 </div>
 
 <div class="stats-grid">
@@ -12,16 +11,42 @@
         <div class="stat-value accent">{{ total_clients }}</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Pending Review</div>
-        <div class="stat-value" style="color:var(--orange);">{{ pending_count }}</div>
-    </div>
-    <div class="stat-card">
         <div class="stat-label">Active Clients</div>
         <div class="stat-value green">{{ active_count }}</div>
     </div>
     <div class="stat-card">
         <div class="stat-label">Today's Calls</div>
         <div class="stat-value blue">{{ today_calls }}</div>
+    </div>
+</div>
+
+<!-- CREATE CLIENT -->
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header"><h3>Create Client</h3></div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('admin_create_client') }}">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                <div class="form-group" style="margin:0;"><label>Name *</label><input type="text" name="name" class="form-control" required></div>
+                <div class="form-group" style="margin:0;"><label>Email *</label><input type="email" name="email" class="form-control" required></div>
+                <div class="form-group" style="margin:0;"><label>Password *</label><input type="text" name="password" class="form-control" required></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px;">
+                <div class="form-group" style="margin:0;"><label>Phone</label><input type="tel" name="phone" class="form-control" placeholder="+44..."></div>
+                <div class="form-group" style="margin:0;"><label>Business Name *</label><input type="text" name="business_name" class="form-control" required></div>
+                <div class="form-group" style="margin:0;"><label>Business Type</label><input type="text" name="business_type" class="form-control" placeholder="Plumbing, Dental..."></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+                <div class="form-group" style="margin:0;"><label>Tier</label>
+                    <select name="tier" class="form-control"><option value="starter">Starter</option><option value="growth" selected>Growth</option><option value="enterprise">Enterprise</option></select>
+                </div>
+                <div class="form-group" style="margin:0;"><label>Status</label>
+                    <select name="status" class="form-control"><option value="active" selected>Active</option><option value="pending">Pending</option></select>
+                </div>
+            </div>
+            <div class="form-group" style="margin:12px 0 0;"><label>Greeting</label><textarea name="greeting" class="form-control" rows="2" placeholder="Hello, thank you for calling..."></textarea></div>
+            <div class="form-group" style="margin:12px 0 0;"><label>Prompt</label><textarea name="agent_personality" class="form-control" rows="3" placeholder="You are a friendly receptionist for [Business]..."></textarea></div>
+            <button type="submit" class="btn btn-primary btn-sm" style="margin-top:12px;">Create Client</button>
+        </form>
     </div>
 </div>
 
@@ -42,14 +67,10 @@
                 <td style="font-size:0.85rem;">{{ u.created_at.strftime('%d %b %H:%M') if u.created_at else '-' }}</td>
                 <td style="display:flex;gap:6px;">
                     {% if u.role == 'client' and u.status != 'active' %}
-                    <form method="POST" action="{{ url_for('admin_activate_client', user_id=u.id) }}">
-                        <button class="btn btn-sm btn-primary">Activate</button>
-                    </form>
+                    <form method="POST" action="{{ url_for('admin_activate_client', user_id=u.id) }}"><button class="btn btn-sm btn-primary">Activate</button></form>
                     {% endif %}
                     {% if u.role == 'client' and u.status == 'active' %}
-                    <form method="POST" action="{{ url_for('admin_suspend_client', user_id=u.id) }}">
-                        <button class="btn btn-sm" style="background:#ef4444;color:#fff;">Suspend</button>
-                    </form>
+                    <form method="POST" action="{{ url_for('admin_suspend_client', user_id=u.id) }}"><button class="btn btn-sm" style="background:#ef4444;color:#fff;">Suspend</button></form>
                     {% endif %}
                 </td>
             </tr>
@@ -62,40 +83,49 @@
     </div>
 </div>
 
-<!-- PENDING CLIENTS -->
-{% if pending_clients %}
+<!-- PHONE NUMBERS -->
 <div class="card" style="margin-bottom:24px;">
-    <div class="card-header"><h3>Pending Clients</h3></div>
-    <div class="card-body no-pad">
+    <div class="card-header"><h3>Phone Numbers</h3></div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('admin_add_number') }}" style="margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid var(--border-color);">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                <div class="form-group" style="margin:0;"><label>Number *</label><input type="text" name="number" class="form-control" placeholder="+447123456789" required></div>
+                <div class="form-group" style="margin:0;"><label>Label</label><input type="text" name="label" class="form-control" placeholder="Sales, Support"></div>
+                <div class="form-group" style="margin:0;"><label>Business</label>
+                    <select name="business_id" class="form-control"><option value="">— Unassigned —</option>{% for b in businesses %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}</select>
+                </div>
+            </div>
+            <div class="form-group" style="margin:12px 0 0;"><label>Greeting</label><textarea name="greeting" class="form-control" rows="2" placeholder="Hello, thank you for calling..."></textarea></div>
+            <div class="form-group" style="margin:12px 0 0;"><label>Prompt</label><textarea name="agent_personality" class="form-control" rows="3" placeholder="You are a friendly receptionist..."></textarea></div>
+            <button type="submit" class="btn btn-primary btn-sm" style="margin-top:12px;">Add Number</button>
+        </form>
+        {% if phone_numbers %}
         <table class="data-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Business</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Number</th><th>Label</th><th>Business</th><th>Greeting</th><th>Prompt</th><th>Actions</th></tr></thead>
             <tbody>
-            {% for c in pending_clients %}
+            {% for n in phone_numbers %}
             <tr>
-                <td>{{ c.name }}</td>
-                <td style="font-size:0.85rem;">{{ c.email }}</td>
-                <td>{{ c.business_name or '-' }}</td>
-                <td><span class="badge badge-neutral">{{ c.business_type or '-' }}</span></td>
-                <td><span class="badge badge-{{ c.status }}">{{ c.status }}</span></td>
-                <td style="display:flex;gap:6px;">
-                    <form method="POST" action="{{ url_for('admin_activate_client', user_id=c.id) }}">
-                        <button class="btn btn-sm btn-primary">Activate</button>
+                <td style="font-family:var(--font-mono);font-size:0.85rem;">{{ n.number }}</td>
+                <td>{{ n.label or '—' }}</td>
+                <td>{{ n.business_name or '—' }}</td>
+                <td style="font-size:0.75rem;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ n.greeting or '—' }}</td>
+                <td style="font-size:0.75rem;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ n.agent_personality or '—' }}</td>
+                <td>
+                    <form method="POST" action="{{ url_for('admin_delete_number', number_id=n.id) }}" onsubmit="return confirm('Delete?')" style="display:inline;">
+                        <button class="btn btn-sm" style="background:#ef4444;color:#fff;">Delete</button>
                     </form>
                 </td>
             </tr>
             {% endfor %}
             </tbody>
         </table>
+        {% endif %}
     </div>
 </div>
-{% endif %}
 
 <!-- ONBOARDING CALLS -->
 <div class="card" style="margin-bottom:24px;">
-    <div class="card-header">
-        <h3>Onboarding Calls</h3>
-        <span style="color:var(--text-muted);font-size:0.85rem;">Last 20</span>
-    </div>
+    <div class="card-header"><h3>Onboarding Calls</h3></div>
     <div class="card-body no-pad">
         {% if onboarding_calls %}
         <table class="data-table">
@@ -119,12 +149,9 @@
     </div>
 </div>
 
-<!-- RECENT INCOMING CALLS -->
+<!-- RECENT CALLS -->
 <div class="card">
-    <div class="card-header">
-        <h3>Recent Calls (All Clients)</h3>
-        <span style="color:var(--text-muted);font-size:0.85rem;">Last 20</span>
-    </div>
+    <div class="card-header"><h3>Recent Calls</h3></div>
     <div class="card-body no-pad">
         {% if recent_calls %}
         <table class="data-table">
