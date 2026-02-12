@@ -5,18 +5,24 @@ Flask + PostgreSQL + Gunicorn
 """
 
 import os
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 import json
 import math
 import psycopg2
 import psycopg2.extras
 from datetime import datetime, timedelta
-from twilio.twiml.voice_response import VoiceResponse
 from functools import wraps
 from flask import (Flask, render_template, request, redirect, url_for,
                    session, flash, jsonify, Response, abort)
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from utils import gemini_service, twilio_service
+from twilio.twiml.voice_response import VoiceResponse
 
 # ─── APP CONFIG ────────────────────────────
 
@@ -546,7 +552,10 @@ def client_start_onboarding():
     # Make outbound call
     try:
         client = twilio_service.get_client()
-        from_number = os.environ.get('TWILIO_FROM_NUMBER', '')
+        from_number = os.environ.get('TWILIO_FROM_NUMBER', '').strip()
+        if not from_number:
+            flash('TWILIO_FROM_NUMBER environment variable is not set. Please set it to your Twilio phone number (E.164 format, e.g. +447700900123).', 'error')
+            return redirect(url_for('client_onboarding'))
         call = client.calls.create(
             to=user['phone'],
             from_=from_number,
@@ -685,9 +694,9 @@ def admin_assign_number():
 @app.route('/webhook/incoming-call', methods=['POST', 'GET'])
 def webhook_incoming_call():
     """Main entry: Twilio hits this when a call comes in to any of our numbers."""
-    called_number = request.form.get('Called', '')
-    caller_number = request.form.get('From', '')
-    call_sid = request.form.get('CallSid', '')
+    called_number = request.values.get('Called', '')
+    caller_number = request.values.get('From', '')
+    call_sid = request.values.get('CallSid', '')
 
     # Find which business owns this number
     biz = get_business_by_number(called_number)
@@ -739,7 +748,7 @@ def webhook_incoming_call():
 @app.route('/webhook/gather-response', methods=['POST', 'GET'])
 def webhook_gather_response():
     """Handle speech input from caller, generate AI response."""
-    speech_result = request.form.get('SpeechResult', '')
+    speech_result = request.values.get('SpeechResult', '')
     biz_id = request.args.get('business_id', '')
     call_sid = request.args.get('call_sid', '')
     turn = int(request.args.get('turn', 0))
@@ -828,9 +837,9 @@ def webhook_transfer():
 @app.route('/webhook/call-status', methods=['POST', 'GET'])
 def webhook_call_status():
     """Twilio status callback — fires when call completes."""
-    call_sid = request.form.get('CallSid', '')
-    status = request.form.get('CallStatus', '')
-    duration = int(request.form.get('CallDuration', 0) or 0)
+    call_sid = request.values.get('CallSid', '')
+    status = request.values.get('CallStatus', '')
+    duration = int(request.values.get('CallDuration', 0) or 0)
 
     if status == 'completed':
         call = query_db("SELECT * FROM calls WHERE twilio_call_sid=%s", (call_sid,), one=True)
@@ -901,8 +910,8 @@ def webhook_call_status():
 
 @app.route('/webhook/voicemail-complete', methods=['POST', 'GET'])
 def webhook_voicemail_complete():
-    recording_url = request.form.get('RecordingUrl', '')
-    call_sid = request.form.get('CallSid', '')
+    recording_url = request.values.get('RecordingUrl', '')
+    call_sid = request.values.get('CallSid', '')
     execute_db("UPDATE calls SET status='voicemail', recording_url=%s WHERE twilio_call_sid=%s",
                (recording_url, call_sid))
     resp = VoiceResponse()
@@ -936,7 +945,11 @@ def webhook_onboarding_start():
     """First question of the onboarding interview."""
     biz_id = request.args.get('business_id', '')
     ob_id = request.args.get('onboarding_id', '')
-    questions = cache_get(f"onboarding_q:{ob_id}", as_json=True)
+
+    # Read questions from database (not in-memory cache — fails across workers)
+    row = query_db("SELECT questions_asked FROM onboarding_calls WHERE id=%s", (ob_id,), one=True)
+    questions = json.loads(row['questions_asked']) if row and row['questions_asked'] else []
+
     if not questions or len(questions) == 0:
         resp = VoiceResponse()
         resp.say("Sorry, there was a setup error. We'll call you back.", voice='Polly.Amy')
@@ -957,19 +970,27 @@ def webhook_onboarding_start():
 @app.route('/webhook/onboarding-answer', methods=['POST', 'GET'])
 def webhook_onboarding_answer():
     """Process an onboarding answer, move to next question."""
-    speech = request.form.get('SpeechResult', '')
+    speech = request.values.get('SpeechResult', '')
     biz_id = request.args.get('business_id', '')
     ob_id = request.args.get('onboarding_id', '')
     q_idx = int(request.args.get('q', 0))
 
     questions = cache_get(f"onboarding_q:{ob_id}", as_json=True) or []
+    if not questions:
+        row = query_db("SELECT questions_asked FROM onboarding_calls WHERE id=%s", (ob_id,), one=True)
+        questions = json.loads(row['questions_asked']) if row and row['questions_asked'] else []
 
     # Store answer
     answers = cache_get(f"onboarding_a:{ob_id}", as_json=True) or {}
+    if not answers:
+        row2 = query_db("SELECT extracted_data FROM onboarding_calls WHERE id=%s", (ob_id,), one=True)
+        answers = json.loads(row2['extracted_data']) if row2 and row2['extracted_data'] else {}
     if q_idx < len(questions):
         field_name = questions[q_idx].get('field_name', f'question_{q_idx}')
         answers[field_name] = speech
     cache_set(f"onboarding_a:{ob_id}", answers, ex=3600)
+    # Persist answers to DB so they survive across workers
+    execute_db("UPDATE onboarding_calls SET extracted_data=%s WHERE id=%s", (json.dumps(answers), ob_id))
 
     # Next question or finish
     next_idx = q_idx + 1
@@ -1000,13 +1021,16 @@ def webhook_onboarding_answer():
     return Response(twilio_service.twiml_onboarding_complete(), mimetype='text/xml')
 
 
-@app.route('/webhook/onboarding-next', methods=['POST', 'GET', 'GET'])
+@app.route('/webhook/onboarding-next', methods=['POST', 'GET'])
 def webhook_onboarding_next():
     """Skip to next onboarding question (when no speech detected)."""
     biz_id = request.args.get('business_id', '')
     ob_id = request.args.get('onboarding_id', '')
     q_idx = int(request.args.get('q', 0))
     questions = cache_get(f"onboarding_q:{ob_id}", as_json=True) or []
+    if not questions:
+        row = query_db("SELECT questions_asked FROM onboarding_calls WHERE id=%s", (ob_id,), one=True)
+        questions = json.loads(row['questions_asked']) if row and row['questions_asked'] else []
 
     if q_idx < len(questions):
         return Response(
