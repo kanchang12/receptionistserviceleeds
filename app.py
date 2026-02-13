@@ -189,7 +189,7 @@ def get_business_by_number(phone_number):
 def get_caller_history(business_id, caller_number, limit=2):
     """Get last N calls from this caller to this business — for AI context."""
     rows = query_db("""
-        SELECT summary, category, sentiment, created_at, duration_seconds
+        SELECT summary, category, sentiment, created_at, duration_seconds, caller_name
         FROM calls
         WHERE business_id = %s AND caller_number = %s AND status = 'completed'
         ORDER BY created_at DESC LIMIT %s
@@ -198,7 +198,8 @@ def get_caller_history(business_id, caller_number, limit=2):
         return None
     return [{'date': str(r['created_at']), 'summary': r['summary'],
              'category': r['category'], 'sentiment': r['sentiment'],
-             'duration': r['duration_seconds']} for r in rows]
+             'duration': r['duration_seconds'],
+             'caller_name': r.get('caller_name', '')} for r in rows]
 
 
 def get_current_month():
@@ -1060,20 +1061,25 @@ def webhook_incoming_call():
         return Response(twilio_service.twiml_after_hours(after_msg), mimetype='text/xml')
 
     # Get caller history for AI context
-    caller_hist = get_caller_history(biz_id, caller_number, limit=2)
-    cache_set(f"caller_hist:{call_sid}", caller_hist or [], ex=1800)
+    caller_hist = get_caller_history(biz_id, caller_number, limit=3)
 
-    # Greet and gather — prefer number-specific greeting
+    # Greet and gather — personalize for returning callers
     greeting = biz.get('number_greeting') or biz.get('greeting') or f"Hello, thank you for calling {biz['name']}. How can I help you?"
+
+    # If returning caller with known name, greet by name
+    if caller_hist:
+        known_name = ''
+        for h in caller_hist:
+            if h.get('caller_name'):
+                known_name = h['caller_name']
+                break
+        if known_name:
+            greeting = f"Hello {known_name}, welcome back to {biz['name']}! How can I help you today?"
 
     # Initialize conversation log WITH the greeting so AI knows it was said
     initial_log = [{'role': 'Agent', 'text': greeting}]
     execute_db("UPDATE calls SET conversation_log=%s WHERE twilio_call_sid=%s",
                (json.dumps(initial_log), call_sid))
-
-    # Store number-specific personality in cache for gather-response
-    number_personality = biz.get('number_personality') or biz.get('agent_personality') or ''
-    cache_set(f"num_personality:{call_sid}", number_personality, ex=1800)
 
     # Greet and gather
     return Response(
@@ -1133,19 +1139,20 @@ def webhook_gather_response():
         resp.hangup()
         return Response(str(resp), mimetype='text/xml')
 
-    # Get caller history from cache
-    caller_hist = cache_get(f"caller_hist:{call_sid}", as_json=True)
+    # Get caller history from DB (not cache — multi-worker safe)
+    call_rec = query_db("SELECT caller_number FROM calls WHERE twilio_call_sid=%s", (call_sid,), one=True)
+    caller_number = call_rec['caller_number'] if call_rec else ''
+    caller_hist = get_caller_history(biz_id, caller_number, limit=3) if caller_number else None
 
     # Get knowledge base docs for context
     kb_docs = query_db("SELECT title, content FROM knowledge_base WHERE business_id=%s AND active=TRUE", (biz_id,))
 
-    # Build config for Gemini — prefer number-specific personality
-    num_personality = cache_get(f"num_personality:{call_sid}") or ''
-    if not num_personality:
-        call_row = query_db("SELECT called_number FROM calls WHERE twilio_call_sid=%s", (call_sid,), one=True)
-        if call_row and call_row['called_number']:
-            pn = query_db("SELECT agent_personality FROM phone_numbers WHERE number=%s", (call_row['called_number'],), one=True)
-            num_personality = (pn['agent_personality'] if pn and pn['agent_personality'] else '') or ''
+    # Get number-specific personality from DB
+    num_personality = ''
+    call_row = query_db("SELECT called_number FROM calls WHERE twilio_call_sid=%s", (call_sid,), one=True)
+    if call_row and call_row['called_number']:
+        pn = query_db("SELECT agent_personality FROM phone_numbers WHERE number=%s", (call_row['called_number'],), one=True)
+        num_personality = (pn['agent_personality'] if pn and pn.get('agent_personality') else '') or ''
     config = {
         'greeting': biz.get('greeting', ''),
         'agent_personality': num_personality or biz.get('agent_personality', ''),
@@ -1157,6 +1164,7 @@ def webhook_gather_response():
         'faq': biz.get('faq') if isinstance(biz.get('faq'), list) else [],
         'knowledge_base': [{'title': d['title'], 'content': d['content']} for d in kb_docs] if kb_docs else [],
         'turn': turn,
+        'caller_number': caller_number,
     }
 
     # Generate AI response with caller history
