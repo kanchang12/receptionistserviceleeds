@@ -15,9 +15,20 @@
         <div class="stat-value green">{{ active_count }}</div>
     </div>
     <div class="stat-card">
+        <div class="stat-label">Prime Clients</div>
+        <div class="stat-value" style="color:#a855f7;">{{ prime_count }}</div>
+    </div>
+    <div class="stat-card">
         <div class="stat-label">Today's Calls</div>
         <div class="stat-value blue">{{ today_calls }}</div>
     </div>
+</div>
+
+<!-- SYNC PRIME -->
+<div style="margin-bottom:24px;">
+    <form method="POST" action="{{ url_for('admin_sync_all_prime') }}" style="display:inline;">
+        <button class="btn btn-sm" style="background:#a855f7;color:#fff;">⟳ Sync All Prime Calls (ElevenLabs)</button>
+    </form>
 </div>
 
 <!-- CREATE CLIENT -->
@@ -35,12 +46,21 @@
                 <div class="form-group" style="margin:0;"><label>Business Name *</label><input type="text" name="business_name" class="form-control" required></div>
                 <div class="form-group" style="margin:0;"><label>Business Type</label><input type="text" name="business_type" class="form-control" placeholder="Plumbing, Dental..."></div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px;">
                 <div class="form-group" style="margin:0;"><label>Tier</label>
-                    <select name="tier" class="form-control"><option value="starter">Starter</option><option value="growth" selected>Growth</option><option value="enterprise">Enterprise</option></select>
+                    <select name="tier" class="form-control" id="adminTier" onchange="toggleEL()">
+                        <option value="standard">Standard (£17 — Gemini)</option>
+                        <option value="prime">Prime (£79 — ElevenLabs)</option>
+                        <option value="prime_pro">Prime Pro (£149 — ElevenLabs)</option>
+                        <option value="prime_enterprise">Prime Enterprise (£249 — ElevenLabs)</option>
+                    </select>
                 </div>
                 <div class="form-group" style="margin:0;"><label>Status</label>
                     <select name="status" class="form-control"><option value="active" selected>Active</option><option value="pending">Pending</option></select>
+                </div>
+                <div class="form-group" style="margin:0;" id="elAgentField" style="display:none;">
+                    <label>ElevenLabs Agent ID</label>
+                    <input type="text" name="elevenlabs_agent_id" class="form-control" placeholder="Only for Prime clients">
                 </div>
             </div>
             <div class="form-group" style="margin:12px 0 0;"><label>Greeting</label><textarea name="greeting" class="form-control" rows="2" placeholder="Hello, thank you for calling..."></textarea></div>
@@ -79,6 +99,38 @@
         </table>
         {% else %}
         <div class="empty-state"><h3>No users yet</h3></div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- BUSINESSES / PRIME SYNC -->
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header"><h3>Businesses</h3></div>
+    <div class="card-body no-pad">
+        {% if businesses %}
+        <table class="data-table">
+            <thead><tr><th>Name</th><th>Tier</th><th>Type</th><th>ElevenLabs Agent</th><th>Actions</th></tr></thead>
+            <tbody>
+            {% for b in businesses %}
+            <tr>
+                <td>{{ b.name }}</td>
+                <td>
+                    {% if b.is_prime %}<span class="badge" style="background:#a855f7;color:#fff;">{{ b.tier }}</span>
+                    {% else %}<span class="badge badge-neutral">{{ b.tier }}</span>{% endif %}
+                </td>
+                <td>-</td>
+                <td style="font-family:var(--font-mono);font-size:0.75rem;">{{ b.elevenlabs_agent_id or '—' }}</td>
+                <td>
+                    {% if b.is_prime and b.elevenlabs_agent_id %}
+                    <form method="POST" action="{{ url_for('admin_sync_prime', biz_id=b.id) }}" style="display:inline;">
+                        <button class="btn btn-sm" style="background:#a855f7;color:#fff;">⟳ Sync</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
         {% endif %}
     </div>
 </div>
@@ -155,7 +207,7 @@
     <div class="card-body no-pad">
         {% if recent_calls %}
         <table class="data-table">
-            <thead><tr><th>Time</th><th>Business</th><th>Caller</th><th>Category</th><th>Sentiment</th><th>Duration</th></tr></thead>
+            <thead><tr><th>Time</th><th>Business</th><th>Caller</th><th>Category</th><th>Sentiment</th><th>Duration</th><th>Type</th></tr></thead>
             <tbody>
             {% for c in recent_calls %}
             <tr>
@@ -165,6 +217,7 @@
                 <td><span class="badge badge-neutral">{{ c.category or '-' }}</span></td>
                 <td><span class="badge badge-{{ c.sentiment or 'neutral' }}-s">{{ c.sentiment or '-' }}</span></td>
                 <td>{{ ((c.duration_seconds or 0) / 60)|round(1) }}m</td>
+                <td>{% if c.get('is_prime', False) %}<span style="color:#a855f7;font-weight:600;font-size:0.75rem;">PRIME</span>{% else %}<span style="font-size:0.75rem;">STD</span>{% endif %}</td>
             </tr>
             {% endfor %}
             </tbody>
@@ -174,4 +227,13 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+function toggleEL(){
+    var t=document.getElementById('adminTier').value;
+    var el=document.getElementById('elAgentField');
+    el.style.display=(t.indexOf('prime')===0)?'block':'none';
+}
+toggleEL();
+</script>
 {% endblock %}
