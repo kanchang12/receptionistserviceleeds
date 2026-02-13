@@ -1505,6 +1505,144 @@ def api_live_calls():
 
 
 # ───────────────────────────────────────────
+# MOBILE API (for Flutter app)
+# ───────────────────────────────────────────
+
+import secrets
+
+# Simple token store: {token: user_id}
+_mobile_tokens = {}
+
+
+def mobile_auth_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.headers.get('Authorization', '').replace('Bearer ', '')
+        if not token or token not in _mobile_tokens:
+            return jsonify({'error': 'Unauthorized'}), 401
+        request.mobile_user_id = _mobile_tokens[token]
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.route('/api/mobile/login', methods=['POST'])
+def mobile_login():
+    data = request.get_json() or {}
+    email = data.get('email', '').strip().lower()
+    password = data.get('password', '')
+    if not email or not password:
+        return jsonify({'error': 'Email and password required'}), 400
+
+    user = query_db("SELECT * FROM users WHERE email=%s", (email,), one=True)
+    if not user or not check_password_hash(user['password_hash'], password):
+        return jsonify({'error': 'Invalid credentials'}), 401
+
+    biz = query_db("SELECT * FROM businesses WHERE user_id=%s", (user['id'],), one=True)
+    token = secrets.token_hex(32)
+    _mobile_tokens[token] = user['id']
+
+    return jsonify({
+        'token': token,
+        'user': {
+            'id': str(user['id']),
+            'name': user['name'],
+            'email': user['email'],
+        },
+        'business': {
+            'id': str(biz['id']) if biz else None,
+            'name': biz['name'] if biz else '',
+            'tier': biz['tier'] if biz else 'standard',
+        } if biz else None
+    })
+
+
+@app.route('/api/mobile/calls')
+@mobile_auth_required
+def mobile_calls():
+    user_id = request.mobile_user_id
+    biz = query_db("SELECT * FROM businesses WHERE user_id=%s", (user_id,), one=True)
+    if not biz:
+        return jsonify({'calls': []})
+
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
+    offset = (page - 1) * per_page
+
+    calls = query_db("""
+        SELECT id, caller_number, caller_name, status, category, sentiment,
+               summary, duration_seconds, created_at
+        FROM calls WHERE business_id=%s
+        ORDER BY created_at DESC LIMIT %s OFFSET %s
+    """, (biz['id'], per_page, offset))
+
+    total = query_db("SELECT COUNT(*) as cnt FROM calls WHERE business_id=%s",
+                     (biz['id'],), one=True)
+
+    return jsonify({
+        'calls': [{
+            'id': str(c['id']),
+            'caller_number': c['caller_number'] or '',
+            'caller_name': c.get('caller_name') or '',
+            'status': c['status'] or '',
+            'category': c['category'] or '',
+            'sentiment': c['sentiment'] or '',
+            'summary': c['summary'] or '',
+            'duration': c['duration_seconds'] or 0,
+            'created_at': str(c['created_at']) if c['created_at'] else '',
+        } for c in (calls or [])],
+        'total': total['cnt'] if total else 0,
+        'page': page,
+        'per_page': per_page,
+    })
+
+
+@app.route('/api/mobile/calls/<call_id>')
+@mobile_auth_required
+def mobile_call_detail(call_id):
+    user_id = request.mobile_user_id
+    biz = query_db("SELECT * FROM businesses WHERE user_id=%s", (user_id,), one=True)
+    if not biz:
+        return jsonify({'error': 'No business found'}), 404
+
+    call = query_db("""
+        SELECT id, caller_number, caller_name, called_number, status, category,
+               sentiment, summary, caller_intent, resolution, duration_seconds,
+               created_at, completed_at, conversation_log
+        FROM calls WHERE id=%s AND business_id=%s
+    """, (call_id, biz['id']), one=True)
+
+    if not call:
+        return jsonify({'error': 'Call not found'}), 404
+
+    conv_log = safe_json(call.get('conversation_log'), [])
+
+    return jsonify({
+        'id': str(call['id']),
+        'caller_number': call['caller_number'] or '',
+        'caller_name': call.get('caller_name') or '',
+        'called_number': call['called_number'] or '',
+        'status': call['status'] or '',
+        'category': call['category'] or '',
+        'sentiment': call['sentiment'] or '',
+        'summary': call['summary'] or '',
+        'caller_intent': call.get('caller_intent') or '',
+        'resolution': call.get('resolution') or '',
+        'duration': call['duration_seconds'] or 0,
+        'created_at': str(call['created_at']) if call['created_at'] else '',
+        'completed_at': str(call['completed_at']) if call.get('completed_at') else '',
+        'conversation': conv_log,
+    })
+
+
+@app.route('/api/mobile/logout', methods=['POST'])
+@mobile_auth_required
+def mobile_logout():
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    _mobile_tokens.pop(token, None)
+    return jsonify({'ok': True})
+
+
+# ───────────────────────────────────────────
 # ERRORS
 # ───────────────────────────────────────────
 
