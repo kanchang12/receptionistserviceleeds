@@ -1038,9 +1038,6 @@ def webhook_incoming_call():
     # Ensure we get notified when call ends (critical for analysis)
     twilio_service.set_call_status_callback(call_sid)
 
-    # Start recording
-    twilio_service.start_recording(call_sid)
-
     # Check business hours
     hours = biz.get('business_hours')
     if hours and isinstance(hours, str):
