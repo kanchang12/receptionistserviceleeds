@@ -115,14 +115,15 @@ def twiml_greet_and_gather(greeting, business_id, call_sid):
 
 
 def twiml_respond_and_gather(ai_response, business_id, call_sid, turn):
-    """Say AI response, gather next input."""
+    """Say AI response, gather next input. On timeout → call-end for finalization."""
     resp = VoiceResponse()
-    g = Gather(input='speech', action=f"/webhook/gather-response?business_id={business_id}&call_sid={call_sid}&turn={turn + 1}",
+    g = Gather(input='speech', action=f"/webhook/gather-response?business_id={business_id}&call_sid={call_sid}&turn={turn + 1}&silence=0",
                method='POST', timeout=5, speech_timeout=3, language='en-GB')
     g.say(ai_response, voice='Polly.Amy', language='en-GB')
     resp.append(g)
+    # If gather times out (no speech), say goodbye and redirect to finalization
     resp.say("Thank you for calling. Have a great day!", voice='Polly.Amy')
-    resp.hangup()
+    resp.redirect(f"/webhook/call-end?business_id={business_id}&call_sid={call_sid}")
     return str(resp)
 
 
