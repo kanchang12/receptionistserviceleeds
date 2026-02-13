@@ -101,15 +101,25 @@ def list_numbers():
 
 # ─── TWIML GENERATION ─────────────────────
 
-def twiml_greet_and_gather(greeting, business_id, call_sid):
+def twiml_greet_and_gather(greeting, business_id, call_sid, transfer_number=None):
     """Answer call: greet + gather speech."""
     resp = VoiceResponse()
-    g = Gather(input='speech', action=f"/webhook/gather-response?business_id={business_id}&call_sid={call_sid}&turn=0",
-               method='POST', timeout=5, speech_timeout=3, language='en-GB')
+    g = Gather(input='speech', action=f"/webhook/gather-response?business_id={business_id}&call_sid={call_sid}&turn=0&silence=0",
+               method='POST', timeout=6, speech_timeout=4, language='en-GB')
     g.say(greeting, voice='Polly.Amy', language='en-GB')
     resp.append(g)
-    resp.say("I didn't catch that. Let me transfer you to someone who can help.", voice='Polly.Amy')
-    resp.redirect(f"/webhook/transfer?business_id={business_id}&call_sid={call_sid}")
+    # No speech on first gather — try once more
+    g2 = Gather(input='speech', action=f"/webhook/gather-response?business_id={business_id}&call_sid={call_sid}&turn=0&silence=1",
+               method='POST', timeout=5, speech_timeout=3, language='en-GB')
+    g2.say("Hello? Are you still there? How can I help you today?", voice='Polly.Amy', language='en-GB')
+    resp.append(g2)
+    # Still nothing — transfer if configured, otherwise end
+    if transfer_number:
+        resp.say("Let me transfer you to someone who can help.", voice='Polly.Amy')
+        resp.redirect(f"/webhook/transfer?business_id={business_id}&call_sid={call_sid}")
+    else:
+        resp.say("I didn't catch anything. Thank you for calling. Goodbye!", voice='Polly.Amy')
+        resp.redirect(f"/webhook/call-end?business_id={business_id}&call_sid={call_sid}")
     return str(resp)
 
 
