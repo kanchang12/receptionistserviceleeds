@@ -891,25 +891,32 @@ def admin_sync_all_prime():
 # CALL FINALIZATION — runs analysis inline
 # ───────────────────────────────────────────
 
-GOODBYE_KEYWORDS = ['bye', 'goodbye', 'good bye', 'thanks bye', 'thank you bye',
-                     'cheers', 'take care', 'that is all', "that's all", 'no thanks',
-                     'no thank you', 'nothing else', 'i am done', "i'm done", 'have a good day']
+GOODBYE_KEYWORDS = ['bye', 'goodbye', 'good bye', 'bye bye', 'bye now',
+                     'thanks bye', 'thank you bye', 'thanks goodbye', 'thank you goodbye',
+                     'ok bye', 'okay bye', 'alright bye', 'right bye',
+                     'cheers bye', 'take care bye', 'take care goodbye']
 
 
-def is_goodbye(text):
-    """Check if caller is ending the conversation."""
+def is_goodbye(text, turn=0):
+    """Check if caller is ending the conversation. Only triggers on turn 2+."""
+    # Never end call on first 2 turns — caller is still engaging
+    if turn < 2:
+        return False
+
     t = text.lower().strip().rstrip('.!,')
-    # Exact or near-exact match for short goodbye phrases
+
+    # Only check short utterances — real goodbyes are short
+    if len(t.split()) > 6:
+        return False
+
+    # Exact match on clear goodbye phrases
     if t in GOODBYE_KEYWORDS:
         return True
-    # Contains bye/goodbye at the end
-    if t.endswith('bye') or t.endswith('goodbye') or t.endswith('cheers'):
+
+    # Must contain "bye" or "goodbye" — "thanks" alone is NOT goodbye
+    if 'bye' in t or 'goodbye' in t:
         return True
-    # "thank you" as the whole message (not "thank you, can you also...")
-    if t in ('thank you', 'thanks', 'thank you so much', 'thanks a lot', 'ok thanks', 'okay thanks', 'alright thanks',
-             'ok thank you', 'okay thank you', 'alright thank you', 'great thanks', 'perfect thanks',
-             'lovely thanks', 'brilliant thanks', 'cheers mate', 'ta'):
-        return True
+
     return False
 
 
@@ -934,9 +941,11 @@ def finalize_call(call_sid, biz_id):
 
     def _run_analysis():
         try:
-            conv_log = cache_get(f"conv:{call_sid}", as_json=True) or []
-            if not conv_log and call.get('conversation_log'):
-                conv_log = safe_json(call['conversation_log'], [])
+            # Always read from DB — single source of truth
+            fresh_call = query_db("SELECT * FROM calls WHERE twilio_call_sid=%s", (call_sid,), one=True)
+            conv_log = []
+            if fresh_call and fresh_call.get('conversation_log'):
+                conv_log = safe_json(fresh_call['conversation_log'], [])
 
             if not conv_log:
                 print(f"[finalize] No conversation log for {call_sid}")
@@ -1059,7 +1068,6 @@ def webhook_incoming_call():
 
     # Initialize conversation log WITH the greeting so AI knows it was said
     initial_log = [{'role': 'Agent', 'text': greeting}]
-    cache_set(f"conv:{call_sid}", initial_log, ex=1800)
     execute_db("UPDATE calls SET conversation_log=%s WHERE twilio_call_sid=%s",
                (json.dumps(initial_log), call_sid))
 
@@ -1106,19 +1114,19 @@ def webhook_gather_response():
         resp.hangup()
         return Response(str(resp), mimetype='text/xml')
 
-    # Get conversation log from cache, fallback to DB
-    conv_log = cache_get(f"conv:{call_sid}", as_json=True) or []
-    if not conv_log:
-        call_row2 = query_db("SELECT conversation_log FROM calls WHERE twilio_call_sid=%s", (call_sid,), one=True)
-        if call_row2 and call_row2['conversation_log']:
-            conv_log = safe_json(call_row2['conversation_log'], [])
+    # Get conversation log ALWAYS from DB (cache is per-worker, unreliable with gunicorn)
+    conv_log = []
+    call_row2 = query_db("SELECT conversation_log FROM calls WHERE twilio_call_sid=%s", (call_sid,), one=True)
+    if call_row2 and call_row2.get('conversation_log'):
+        conv_log = safe_json(call_row2['conversation_log'], [])
     conv_log.append({'role': 'Caller', 'text': speech_result})
+    print(f"[gather] turn={turn} call_sid={call_sid} conv_log_entries={len(conv_log)}")
 
     # ── GOODBYE DETECTION ──
-    if is_goodbye(speech_result):
+    if is_goodbye(speech_result, turn=turn):
         conv_log.append({'role': 'Agent', 'text': 'Thank you for calling. Have a great day!'})
-        cache_set(f"conv:{call_sid}", conv_log, ex=1800)
         execute_db("UPDATE calls SET conversation_log=%s WHERE twilio_call_sid=%s", (json.dumps(conv_log), call_sid))
+        print(f"[gather] GOODBYE detected turn={turn}, conv_log={len(conv_log)} entries")
         finalize_call(call_sid, biz_id)
         resp = VoiceResponse()
         resp.say("Thank you for calling. Have a great day! Goodbye.", voice='Polly.Amy')
@@ -1160,15 +1168,15 @@ def webhook_gather_response():
     needs_transfer = any(kw in speech_result.lower() for kw in transfer_keywords)
     if needs_transfer and biz.get('transfer_number'):
         conv_log.append({'role': 'Agent', 'text': 'Transferring to human.'})
-        cache_set(f"conv:{call_sid}", conv_log, ex=1800)
+        execute_db("UPDATE calls SET conversation_log=%s WHERE twilio_call_sid=%s", (json.dumps(conv_log), call_sid))
         return Response(
             twilio_service.twiml_transfer(biz['transfer_number']),
             mimetype='text/xml')
 
     conv_log.append({'role': 'Agent', 'text': ai_response})
-    cache_set(f"conv:{call_sid}", conv_log, ex=1800)
-    # Persist to DB so status webhook can read it (multi-worker)
+    # Always persist to DB (shared across all gunicorn workers)
     execute_db("UPDATE calls SET conversation_log=%s WHERE twilio_call_sid=%s", (json.dumps(conv_log), call_sid))
+    print(f"[gather] Saved conv_log with {len(conv_log)} entries to DB")
 
     # Max 15 turns then end gracefully with analysis
     if turn >= 15:
@@ -1226,9 +1234,8 @@ def webhook_call_status():
         print(f"[call-status] Status set to completed for {call_sid}")
 
         try:
-            conv_log = cache_get(f"conv:{call_sid}", as_json=True) or []
-            if not conv_log and call.get('conversation_log'):
-                conv_log = safe_json(call['conversation_log'], [])
+            # Always read from DB
+            conv_log = safe_json(call.get('conversation_log'), [])
             print(f"[call-status] Conv log has {len(conv_log)} entries")
 
             recording_url = twilio_service.get_recording_url(call_sid)
