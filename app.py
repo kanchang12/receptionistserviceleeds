@@ -1054,17 +1054,22 @@ def webhook_incoming_call():
     caller_hist = get_caller_history(biz_id, caller_number, limit=2)
     cache_set(f"caller_hist:{call_sid}", caller_hist or [], ex=1800)
 
-    # Initialize conversation log in cache
-    cache_set(f"conv:{call_sid}", [], ex=1800)
+    # Greet and gather — prefer number-specific greeting
+    greeting = biz.get('number_greeting') or biz.get('greeting') or f"Hello, thank you for calling {biz['name']}. How can I help you?"
+
+    # Initialize conversation log WITH the greeting so AI knows it was said
+    initial_log = [{'role': 'Agent', 'text': greeting}]
+    cache_set(f"conv:{call_sid}", initial_log, ex=1800)
+    execute_db("UPDATE calls SET conversation_log=%s WHERE twilio_call_sid=%s",
+               (json.dumps(initial_log), call_sid))
 
     # Store number-specific personality in cache for gather-response
     number_personality = biz.get('number_personality') or biz.get('agent_personality') or ''
     cache_set(f"num_personality:{call_sid}", number_personality, ex=1800)
 
-    # Greet and gather — prefer number-specific greeting
-    greeting = biz.get('number_greeting') or biz.get('greeting') or f"Hello, thank you for calling {biz['name']}. How can I help you?"
+    # Greet and gather
     return Response(
-        twilio_service.twiml_greet_and_gather(greeting, biz_id, call_sid),
+        twilio_service.twiml_greet_and_gather(greeting, biz_id, call_sid, transfer_number=biz.get('transfer_number', '')),
         mimetype='text/xml')
 
 
