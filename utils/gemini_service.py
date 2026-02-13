@@ -186,6 +186,7 @@ Restricted info (NEVER share): {config.get('restricted_info', 'None')}
 Special instructions: {config.get('special_instructions', 'None')}
 
 RULES:
+- IMPORTANT: If this is the start of the conversation (turn 0 or 1), politely ask the caller for their name early on.
 - Use caller history to personalize. If they called before, acknowledge it naturally.
 - Respond in 1-3 sentences. Be warm, helpful, concise.
 - If you can't help, offer to transfer.
@@ -214,6 +215,7 @@ def analyze_call_recording(recording_url, business_name, business_type):
   "summary": "2-3 sentence summary",
   "category": "order|complaint|enquiry|booking|support|return|spam|other",
   "sentiment": "positive|neutral|negative",
+  "caller_name": "caller's name if mentioned, otherwise empty string",
   "caller_intent": "one sentence",
   "resolution": "resolved|escalated|unresolved|voicemail",
   "action_items": ["..."],
@@ -234,6 +236,7 @@ def analyze_call_transcript(transcript_text, business_name, business_type):
   "summary": "2-3 sentence summary",
   "category": "order|complaint|enquiry|booking|support|return|spam|other",
   "sentiment": "positive|neutral|negative",
+  "caller_name": "caller's name if mentioned, otherwise empty string",
   "caller_intent": "one sentence",
   "resolution": "resolved|escalated|unresolved|voicemail",
   "action_items": ["..."],
