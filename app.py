@@ -1,6 +1,6 @@
 """
 VoiceBot SaaS Platform
-Twilio telephony + Gemini AI backbone
+Two-tier: Standard (Gemini+Twilio) + Prime (ElevenLabs)
 Flask + PostgreSQL + Gunicorn
 """
 
@@ -21,7 +21,7 @@ from flask import (Flask, render_template, request, redirect, url_for,
                    session, flash, jsonify, Response, abort)
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from utils import gemini_service, twilio_service
+from utils import gemini_service, twilio_service, elevenlabs_service
 from twilio.twiml.voice_response import VoiceResponse
 
 # ─── APP CONFIG ────────────────────────────
@@ -95,7 +95,6 @@ def insert_db(sql, params=None):
 
 
 # ─── IN-MEMORY CACHE ──────────────────────
-# Stores conversation state during live calls. No external dependency needed.
 
 _mem_store = {}
 
@@ -157,14 +156,19 @@ def client_required(f):
     return decorated
 
 
-# ─── HELPERS ───────────────────────────────
+# ─── TIER CONFIG ──────────────────────────
 
 TIER_LIMITS = {
-    'starter': {'minutes': 200, 'numbers': 1, 'price': 29},
-    'growth': {'minutes': 600, 'numbers': 2, 'price': 79},
-    'enterprise': {'minutes': 2000, 'numbers': 5, 'price': 199},
+    # Standard tier — Gemini + Twilio
+    'standard':         {'minutes': 120, 'numbers': 1, 'price': 17,  'label': 'Standard',         'is_prime': False},
+    # Prime tiers — ElevenLabs powered
+    'prime':            {'minutes': 200, 'numbers': 2, 'price': 79,  'label': 'Prime',             'is_prime': True},
+    'prime_pro':        {'minutes': 500, 'numbers': 3, 'price': 149, 'label': 'Prime Pro',         'is_prime': True},
+    'prime_enterprise': {'minutes': 1200,'numbers': 5, 'price': 249, 'label': 'Prime Enterprise',  'is_prime': True},
 }
 
+
+# ─── HELPERS ───────────────────────────────
 
 def get_business_for_user(user_id):
     return query_db("SELECT * FROM businesses WHERE user_id=%s LIMIT 1", (user_id,), one=True)
@@ -207,8 +211,8 @@ def get_or_create_usage(business_id):
                    (business_id, month), one=True)
     if not row:
         biz = query_db("SELECT tier FROM businesses WHERE id=%s", (business_id,), one=True)
-        tier = biz['tier'] if biz else 'starter'
-        limit = TIER_LIMITS.get(tier, TIER_LIMITS['starter'])['minutes']
+        tier = biz['tier'] if biz else 'standard'
+        limit = TIER_LIMITS.get(tier, TIER_LIMITS['standard'])['minutes']
         execute_db("INSERT INTO minutes_usage (business_id, month, minutes_limit) VALUES (%s,%s,%s)",
                    (business_id, month, limit))
         row = query_db("SELECT * FROM minutes_usage WHERE business_id=%s AND month=%s",
@@ -231,7 +235,7 @@ def add_call_minutes(business_id, seconds):
     if pct >= 100 and not usage['alert_100_sent']:
         execute_db("UPDATE minutes_usage SET alert_100_sent=TRUE WHERE business_id=%s AND month=%s", (business_id, month))
         if user and user['phone']:
-            twilio_service.send_sms(user['phone'], f"VoiceBot Alert: You've used 100% of your monthly minutes for {biz['name']}. Calls will use overage billing at £0.08/min.")
+            twilio_service.send_sms(user['phone'], f"VoiceBot Alert: You've used 100% of your monthly minutes for {biz['name']}. Overage billing applies.")
     elif pct >= 90 and not usage['alert_90_sent']:
         execute_db("UPDATE minutes_usage SET alert_90_sent=TRUE WHERE business_id=%s AND month=%s", (business_id, month))
         if user and user['phone']:
@@ -245,7 +249,7 @@ def add_call_minutes(business_id, seconds):
 def is_within_business_hours(business_hours):
     """Check if current time is within business hours config."""
     if not business_hours:
-        return True  # no hours set = always open
+        return True
     if isinstance(business_hours, str):
         try:
             business_hours = json.loads(business_hours)
@@ -291,6 +295,12 @@ def register():
         password = request.form.get('password', '')
         business_name = request.form.get('business_name', '').strip()
         business_type = request.form.get('business_type', '').strip()
+        tier = request.form.get('tier', 'standard').strip()
+
+        # Validate tier
+        if tier not in TIER_LIMITS:
+            tier = 'standard'
+        is_prime = TIER_LIMITS[tier]['is_prime']
 
         if not all([name, email, password, business_name]):
             flash('All fields are required.', 'error')
@@ -308,8 +318,8 @@ def register():
 
         if user_id:
             biz_id = insert_db(
-                "INSERT INTO businesses (user_id, name, business_type, status, tier) VALUES (%s,%s,%s,'pending','starter') RETURNING id",
-                (user_id, business_name, business_type))
+                "INSERT INTO businesses (user_id, name, business_type, status, tier, is_prime) VALUES (%s,%s,%s,'pending',%s,%s) RETURNING id",
+                (user_id, business_name, business_type, tier, is_prime))
 
             session['user_id'] = str(user_id)
             session['role'] = 'client'
@@ -598,7 +608,7 @@ def client_start_onboarding():
         client = twilio_service.get_client()
         from_number = os.environ.get('TWILIO_FROM_NUMBER', '').strip()
         if not from_number:
-            flash('TWILIO_FROM_NUMBER environment variable is not set. Please set it to your Twilio phone number (E.164 format, e.g. +447700900123).', 'error')
+            flash('TWILIO_FROM_NUMBER environment variable is not set.', 'error')
             return redirect(url_for('client_onboarding'))
         call = client.calls.create(
             to=user['phone'],
@@ -630,6 +640,7 @@ def admin_dashboard():
     total_clients = query_db("SELECT COUNT(*) as cnt FROM users WHERE role='client'", one=True)
     pending = query_db("SELECT COUNT(*) as cnt FROM users WHERE status='ready_for_review'", one=True)
     active = query_db("SELECT COUNT(*) as cnt FROM users WHERE status='active' AND role='client'", one=True)
+    prime_count = query_db("SELECT COUNT(*) as cnt FROM businesses WHERE is_prime=TRUE", one=True)
     today = datetime.now().date()
     today_calls = query_db("SELECT COUNT(*) as cnt FROM calls WHERE created_at::date=%s", (today,), one=True)
     recent_calls = query_db("SELECT c.*, b.name as business_name FROM calls c JOIN businesses b ON c.business_id=b.id ORDER BY c.created_at DESC LIMIT 20")
@@ -650,12 +661,13 @@ def admin_dashboard():
         SELECT p.*, b.name as business_name FROM phone_numbers p
         LEFT JOIN businesses b ON p.business_id=b.id ORDER BY p.created_at DESC
     """)
-    businesses = query_db("SELECT id, name FROM businesses ORDER BY name")
+    businesses = query_db("SELECT id, name, is_prime, tier, elevenlabs_agent_id FROM businesses ORDER BY name")
 
     return render_template('admin/dashboard.html',
                            total_clients=total_clients['cnt'] if total_clients else 0,
                            pending_count=pending['cnt'] if pending else 0,
                            active_count=active['cnt'] if active else 0,
+                           prime_count=prime_count['cnt'] if prime_count else 0,
                            today_calls=today_calls['cnt'] if today_calls else 0,
                            recent_calls=recent_calls, pending_clients=pending_clients,
                            onboarding_calls=onboarding_calls, all_users=all_users,
@@ -684,8 +696,12 @@ def admin_create_client():
     password = request.form.get('password', '').strip()
     business_name = request.form.get('business_name', '').strip()
     business_type = request.form.get('business_type', '').strip()
-    tier = request.form.get('tier', 'starter')
+    tier = request.form.get('tier', 'standard')
     status = request.form.get('status', 'active')
+    elevenlabs_agent_id = request.form.get('elevenlabs_agent_id', '').strip()
+
+    # Determine if Prime
+    is_prime = TIER_LIMITS.get(tier, {}).get('is_prime', False)
 
     if not all([name, email, password, business_name]):
         flash('Name, email, password and business name are required.', 'error')
@@ -705,9 +721,11 @@ def admin_create_client():
         greeting = request.form.get('greeting', '').strip()
         agent_personality = request.form.get('agent_personality', '').strip()
         insert_db(
-            "INSERT INTO businesses (user_id, name, business_type, status, tier, greeting, agent_personality) VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id",
-            (user_id, business_name, business_type, status, tier, greeting, agent_personality))
-        flash(f'Client {name} created.', 'success')
+            """INSERT INTO businesses (user_id, name, business_type, status, tier, is_prime, elevenlabs_agent_id, greeting, agent_personality)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+            (user_id, business_name, business_type, status, tier, is_prime, elevenlabs_agent_id, greeting, agent_personality))
+        tier_label = TIER_LIMITS.get(tier, {}).get('label', tier)
+        flash(f'Client {name} created ({tier_label}).', 'success')
     else:
         flash('Failed to create client.', 'error')
     return redirect(url_for('admin_dashboard'))
@@ -761,9 +779,116 @@ def admin_delete_number(number_id):
     return redirect(url_for('admin_dashboard'))
 
 
+# ───────────────────────────────────────────
+# ELEVENLABS PRIME — SYNC CALLS
+# ───────────────────────────────────────────
+
+@app.route('/admin/sync-prime/<biz_id>', methods=['POST', 'GET'])
+@login_required
+@admin_required
+def admin_sync_prime(biz_id):
+    """Pull latest calls from ElevenLabs for a Prime client."""
+    biz = query_db("SELECT * FROM businesses WHERE id=%s", (biz_id,), one=True)
+    if not biz or not biz.get('is_prime') or not biz.get('elevenlabs_agent_id'):
+        flash('Not a Prime client or no ElevenLabs agent ID set.', 'error')
+        return redirect(url_for('admin_dashboard'))
+
+    agent_id = biz['elevenlabs_agent_id']
+
+    # Get last synced timestamp
+    last_call = query_db(
+        "SELECT created_at FROM calls WHERE business_id=%s AND is_prime=TRUE ORDER BY created_at DESC LIMIT 1",
+        (biz_id,), one=True)
+    after_unix = None
+    if last_call and last_call['created_at']:
+        after_unix = int(last_call['created_at'].timestamp())
+
+    # Fetch from ElevenLabs
+    conversations = elevenlabs_service.list_conversations(agent_id, limit=50, after_unix=after_unix)
+    synced = 0
+    for conv in conversations:
+        conv_id = conv.get('conversation_id', '')
+        if not conv_id:
+            continue
+
+        # Skip if already synced
+        existing = query_db("SELECT id FROM calls WHERE elevenlabs_conversation_id=%s", (conv_id,), one=True)
+        if existing:
+            continue
+
+        # Get full detail
+        detail = elevenlabs_service.get_conversation_detail(conv_id)
+        mapped = elevenlabs_service.map_conversation_to_call(conv, detail, business_id=biz_id)
+
+        # Insert into calls
+        start_ts = datetime.fromtimestamp(mapped['start_time_unix']) if mapped['start_time_unix'] else datetime.now()
+        insert_db("""INSERT INTO calls (business_id, elevenlabs_conversation_id, caller_number, called_number,
+                     caller_name, direction, status, duration_seconds, transcript, summary, category, sentiment,
+                     caller_intent, resolution, conversation_log, is_prime, created_at, completed_at)
+                     VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TRUE,%s,%s) RETURNING id""",
+                  (biz_id, conv_id, mapped['caller_number'], mapped['called_number'],
+                   mapped['caller_name'], mapped['direction'], mapped['status'],
+                   mapped['duration_seconds'], mapped['transcript'], mapped['summary'],
+                   mapped['category'], mapped['sentiment'], mapped['caller_intent'],
+                   mapped['resolution'], json.dumps(mapped['conversation_log']),
+                   start_ts, start_ts if mapped['status'] == 'completed' else None))
+
+        # Add minutes
+        if mapped['duration_seconds'] > 0:
+            add_call_minutes(biz_id, mapped['duration_seconds'])
+
+        synced += 1
+
+    flash(f'Synced {synced} new calls from ElevenLabs for {biz["name"]}.', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/sync-all-prime', methods=['POST', 'GET'])
+@login_required
+@admin_required
+def admin_sync_all_prime():
+    """Sync calls for ALL Prime clients."""
+    prime_bizs = query_db("SELECT id, name, elevenlabs_agent_id FROM businesses WHERE is_prime=TRUE AND elevenlabs_agent_id IS NOT NULL AND elevenlabs_agent_id != ''")
+    total_synced = 0
+    for biz in (prime_bizs or []):
+        agent_id = biz['elevenlabs_agent_id']
+        last_call = query_db(
+            "SELECT created_at FROM calls WHERE business_id=%s AND is_prime=TRUE ORDER BY created_at DESC LIMIT 1",
+            (str(biz['id']),), one=True)
+        after_unix = int(last_call['created_at'].timestamp()) if last_call and last_call['created_at'] else None
+
+        conversations = elevenlabs_service.list_conversations(agent_id, limit=50, after_unix=after_unix)
+        for conv in conversations:
+            conv_id = conv.get('conversation_id', '')
+            if not conv_id:
+                continue
+            existing = query_db("SELECT id FROM calls WHERE elevenlabs_conversation_id=%s", (conv_id,), one=True)
+            if existing:
+                continue
+
+            detail = elevenlabs_service.get_conversation_detail(conv_id)
+            mapped = elevenlabs_service.map_conversation_to_call(conv, detail, business_id=str(biz['id']))
+            start_ts = datetime.fromtimestamp(mapped['start_time_unix']) if mapped['start_time_unix'] else datetime.now()
+            insert_db("""INSERT INTO calls (business_id, elevenlabs_conversation_id, caller_number, called_number,
+                         caller_name, direction, status, duration_seconds, transcript, summary, category, sentiment,
+                         caller_intent, resolution, conversation_log, is_prime, created_at, completed_at)
+                         VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,TRUE,%s,%s) RETURNING id""",
+                      (str(biz['id']), conv_id, mapped['caller_number'], mapped['called_number'],
+                       mapped['caller_name'], mapped['direction'], mapped['status'],
+                       mapped['duration_seconds'], mapped['transcript'], mapped['summary'],
+                       mapped['category'], mapped['sentiment'], mapped['caller_intent'],
+                       mapped['resolution'], json.dumps(mapped['conversation_log']),
+                       start_ts, start_ts if mapped['status'] == 'completed' else None))
+            if mapped['duration_seconds'] > 0:
+                add_call_minutes(str(biz['id']), mapped['duration_seconds'])
+            total_synced += 1
+
+    flash(f'Synced {total_synced} total Prime calls across all clients.', 'success')
+    return redirect(url_for('admin_dashboard'))
+
 
 # ───────────────────────────────────────────
-# TWILIO WEBHOOKS — THE CALL ENGINE
+# TWILIO WEBHOOKS — THE CALL ENGINE (Standard tier)
 # ───────────────────────────────────────────
 
 @app.route('/webhook/incoming-call', methods=['POST', 'GET'])
@@ -838,10 +963,9 @@ def webhook_gather_response():
     if not speech_result:
         resp = VoiceResponse()
         resp.say("I didn't catch that. Could you please repeat?", voice='Polly.Amy')
-        g = Gather(input='speech',
+        g = resp.gather(input='speech',
                    action=f"/webhook/gather-response?business_id={biz_id}&call_sid={call_sid}&turn={turn}",
-                   method='POST', timeout=5, speech_timeout=3, language='en-GB')
-        resp.append(g)
+                   method='POST', timeout=5, speech_timeout='3', language='en-GB')
         return Response(str(resp), mimetype='text/xml')
 
     biz = query_db("SELECT * FROM businesses WHERE id=%s", (biz_id,), one=True)
@@ -868,7 +992,6 @@ def webhook_gather_response():
     # Build config for Gemini — prefer number-specific personality
     num_personality = cache_get(f"num_personality:{call_sid}") or ''
     if not num_personality:
-        # Fallback: look up from DB via call's called_number
         call_row = query_db("SELECT called_number FROM calls WHERE twilio_call_sid=%s", (call_sid,), one=True)
         if call_row and call_row['called_number']:
             pn = query_db("SELECT agent_personality FROM phone_numbers WHERE number=%s", (call_row['called_number'],), one=True)
@@ -882,7 +1005,8 @@ def webhook_gather_response():
         'restricted_info': biz.get('restricted_info', ''),
         'special_instructions': '',
         'faq': biz.get('faq') if isinstance(biz.get('faq'), list) else [],
-        'knowledge_base': [{'title': d['title'], 'content': d['content']} for d in kb_docs] if kb_docs else []
+        'knowledge_base': [{'title': d['title'], 'content': d['content']} for d in kb_docs] if kb_docs else [],
+        'turn': turn,
     }
 
     # Generate AI response with caller history
@@ -945,7 +1069,7 @@ def webhook_call_status():
 
         biz_id = str(call['business_id'])
 
-        # Always update status first — no matter what happens next
+        # Always update status first
         execute_db("""UPDATE calls SET status='completed', duration_seconds=%s, completed_at=NOW()
                       WHERE twilio_call_sid=%s""", (duration, call_sid))
         print(f"[call-status] Status set to completed for {call_sid}")
@@ -977,16 +1101,17 @@ def webhook_call_status():
                 print(f"[call-status] No recording and no conv_log — cannot analyze")
 
             if analysis:
-                print(f"[call-status] Analysis done: category={analysis.get('category')}, sentiment={analysis.get('sentiment')}")
+                print(f"[call-status] Analysis done: category={analysis.get('category')}, sentiment={analysis.get('sentiment')}, caller={analysis.get('caller_name','')}")
                 execute_db("""UPDATE calls SET recording_url=%s, transcript=%s, summary=%s,
                               category=%s, sentiment=%s, caller_intent=%s, resolution=%s,
-                              action_items=%s, conversation_log=%s
+                              action_items=%s, conversation_log=%s, caller_name=%s
                               WHERE twilio_call_sid=%s""",
                            (recording_url,
                             analysis.get('transcript', ''), analysis.get('summary', ''),
                             analysis.get('category', 'other'), analysis.get('sentiment', 'neutral'),
                             analysis.get('caller_intent', ''), analysis.get('resolution', 'unresolved'),
                             json.dumps(analysis.get('action_items', [])), json.dumps(conv_log),
+                            analysis.get('caller_name', ''),
                             call_sid))
 
                 # Auto-create ticket if needed
@@ -1071,7 +1196,6 @@ def webhook_onboarding_start():
         resp.hangup()
         return Response(str(resp), mimetype='text/xml')
 
-    # Welcome message + first question — all in one Response
     resp = VoiceResponse()
     resp.say("Hello! I'm going to ask you a few questions to set up your AI receptionist. Let's get started!",
              voice='Polly.Amy', language='en-GB')
@@ -1107,7 +1231,6 @@ def webhook_onboarding_answer():
         field_name = questions[q_idx].get('field_name', f'question_{q_idx}')
         answers[field_name] = speech
     cache_set(f"onboarding_a:{ob_id}", answers, ex=3600)
-    # Persist answers to DB so they survive across workers
     execute_db("UPDATE onboarding_calls SET extracted_data=%s WHERE id=%s", (json.dumps(answers), ob_id))
 
     # Next question or finish
@@ -1132,7 +1255,6 @@ def webhook_onboarding_answer():
                     json.dumps(config), biz_id))
         execute_db("UPDATE users SET status='ready_for_review' WHERE id=%s", (biz['user_id'],))
 
-    # Save onboarding data
     execute_db("""UPDATE onboarding_calls SET extracted_data=%s, status='completed', completed_at=NOW()
                   WHERE id=%s""", (json.dumps(answers), ob_id))
 
@@ -1175,7 +1297,7 @@ def api_usage():
     usage = get_or_create_usage(biz_id)
     return jsonify({
         'minutes_used': float(usage['minutes_used']) if usage else 0,
-        'minutes_limit': usage['minutes_limit'] if usage else 200,
+        'minutes_limit': usage['minutes_limit'] if usage else 120,
         'active_calls': int(cache_get(f"active_calls:{biz_id}") or 0)
     })
 
@@ -1231,12 +1353,30 @@ with app.app_context():
         print(f"⚠️ Admin setup: {e}")
 
     # Auto-migrate: add new columns if missing
-    for col, typ in [('label', "VARCHAR(100) DEFAULT ''"), ('greeting', "TEXT DEFAULT ''"), ('agent_personality', "TEXT DEFAULT ''")]:
+    migrations = [
+        ("phone_numbers", "label", "VARCHAR(100) DEFAULT ''"),
+        ("phone_numbers", "greeting", "TEXT DEFAULT ''"),
+        ("phone_numbers", "agent_personality", "TEXT DEFAULT ''"),
+        ("businesses", "is_prime", "BOOLEAN NOT NULL DEFAULT FALSE"),
+        ("businesses", "elevenlabs_agent_id", "VARCHAR(100) DEFAULT ''"),
+        ("calls", "caller_name", "VARCHAR(200)"),
+        ("calls", "elevenlabs_conversation_id", "VARCHAR(100)"),
+        ("calls", "is_prime", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ]
+    for table, col, typ in migrations:
         try:
-            execute_db(f"ALTER TABLE phone_numbers ADD COLUMN {col} {typ}")
-            print(f"✅ Added phone_numbers.{col}")
+            execute_db(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
+            print(f"✅ Added {table}.{col}")
         except Exception:
             pass  # column already exists
+
+    # Migrate tier values: starter→standard, growth→prime, enterprise→prime_enterprise
+    try:
+        execute_db("UPDATE businesses SET tier='standard' WHERE tier='starter'")
+        execute_db("UPDATE businesses SET tier='prime', is_prime=TRUE WHERE tier='growth'")
+        execute_db("UPDATE businesses SET tier='prime_enterprise', is_prime=TRUE WHERE tier='enterprise'")
+    except Exception:
+        pass
 
 # ───────────────────────────────────────────
 
