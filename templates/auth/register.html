@@ -38,7 +38,17 @@
         </div>
         <div class="form-group">
             <label class="form-label">Business Type</label>
-            <input type="text" name="business_type" class="form-input" required placeholder="e.g. Plumbing, Dental, Restaurant, Consulting...">
+            <input type="text" name="business_type" class="form-input" required placeholder="e.g. Plumbing, Dental, Restaurant...">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Plan</label>
+            <select name="tier" class="form-input" id="tierSelect" onchange="updateTierInfo()">
+                <option value="standard" selected>Standard — £17/mo (120 min, Gemini AI)</option>
+                <option value="prime">Prime — £79/mo (200 min, Premium Voice AI)</option>
+                <option value="prime_pro">Prime Pro — £149/mo (500 min, Premium Voice AI)</option>
+                <option value="prime_enterprise">Prime Enterprise — £249/mo (1200 min, Premium Voice AI)</option>
+            </select>
+            <div id="tierInfo" style="margin-top:6px;font-size:0.82rem;color:var(--text-muted);">AI-powered receptionist with call recording, transcription &amp; analytics.</div>
         </div>
         <button type="submit" class="btn btn-primary btn-block">Create Account</button>
     </form>
@@ -46,4 +56,16 @@
         Already have an account? <a href="{{ url_for('login') }}">Sign in</a>
     </div>
 </div>
+<script>
+function updateTierInfo(){
+    var t=document.getElementById('tierSelect').value, el=document.getElementById('tierInfo');
+    var info={
+        'standard':'AI-powered receptionist with call recording, transcription & analytics. Powered by Google Gemini.',
+        'prime':'Premium voice AI with knowledge base, calendar integration & natural conversations.',
+        'prime_pro':'Everything in Prime with higher volume and priority support.',
+        'prime_enterprise':'Full-featured enterprise solution with dedicated support & custom integrations.'
+    };
+    el.innerHTML=info[t]||info['standard'];
+}
+</script>
 {% endblock %}
