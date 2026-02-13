@@ -888,6 +888,125 @@ def admin_sync_all_prime():
 
 
 # ───────────────────────────────────────────
+# CALL FINALIZATION — runs analysis inline
+# ───────────────────────────────────────────
+
+GOODBYE_KEYWORDS = ['bye', 'goodbye', 'good bye', 'thanks bye', 'thank you bye',
+                     'cheers', 'take care', 'that is all', "that's all", 'no thanks',
+                     'no thank you', 'nothing else', 'i am done', "i'm done", 'have a good day']
+
+
+def is_goodbye(text):
+    """Check if caller is ending the conversation."""
+    t = text.lower().strip().rstrip('.!,')
+    # Exact or near-exact match for short goodbye phrases
+    if t in GOODBYE_KEYWORDS:
+        return True
+    # Contains bye/goodbye at the end
+    if t.endswith('bye') or t.endswith('goodbye') or t.endswith('cheers'):
+        return True
+    # "thank you" as the whole message (not "thank you, can you also...")
+    if t in ('thank you', 'thanks', 'thank you so much', 'thanks a lot', 'ok thanks', 'okay thanks', 'alright thanks',
+             'ok thank you', 'okay thank you', 'alright thank you', 'great thanks', 'perfect thanks',
+             'lovely thanks', 'brilliant thanks', 'cheers mate', 'ta'):
+        return True
+    return False
+
+
+def finalize_call(call_sid, biz_id):
+    """Run post-call analysis on a call. Returns True if analysis ran."""
+    import threading
+
+    call = query_db("SELECT * FROM calls WHERE twilio_call_sid=%s", (call_sid,), one=True)
+    if not call:
+        print(f"[finalize] No call record for {call_sid}")
+        return False
+
+    # Skip if already finalized
+    if call.get('status') == 'completed' and call.get('summary'):
+        print(f"[finalize] Already done for {call_sid}")
+        return True
+
+    # Mark completed immediately
+    execute_db("""UPDATE calls SET status='completed', completed_at=NOW()
+                  WHERE twilio_call_sid=%s AND status='in_progress'""", (call_sid,))
+    cache_decr(f"active_calls:{biz_id}")
+
+    def _run_analysis():
+        try:
+            conv_log = cache_get(f"conv:{call_sid}", as_json=True) or []
+            if not conv_log and call.get('conversation_log'):
+                conv_log = safe_json(call['conversation_log'], [])
+
+            if not conv_log:
+                print(f"[finalize] No conversation log for {call_sid}")
+                return
+
+            biz = query_db("SELECT * FROM businesses WHERE id=%s", (biz_id,), one=True)
+            if not biz:
+                return
+
+            # Try recording first (may not be ready yet for inline calls)
+            recording_url = twilio_service.get_recording_url(call_sid)
+            analysis = None
+            if recording_url:
+                analysis = gemini_service.analyze_call_recording(
+                    recording_url, biz['name'], biz.get('business_type', ''))
+
+            if not analysis:
+                # Fall back to transcript
+                transcript = "\n".join(f"{e['role']}: {e['text']}" for e in conv_log)
+                analysis = gemini_service.analyze_call_transcript(
+                    transcript, biz['name'], biz.get('business_type', ''))
+
+            if analysis:
+                print(f"[finalize] Analysis OK: category={analysis.get('category')}, caller={analysis.get('caller_name','')}")
+                # Calculate duration from call record
+                dur = 0
+                if call.get('created_at'):
+                    dur = int((datetime.now() - call['created_at']).total_seconds())
+
+                execute_db("""UPDATE calls SET recording_url=%s, transcript=%s, summary=%s,
+                              category=%s, sentiment=%s, caller_intent=%s, resolution=%s,
+                              action_items=%s, conversation_log=%s, caller_name=%s, duration_seconds=%s
+                              WHERE twilio_call_sid=%s""",
+                           (recording_url or '',
+                            analysis.get('transcript', ''), analysis.get('summary', ''),
+                            analysis.get('category', 'other'), analysis.get('sentiment', 'neutral'),
+                            analysis.get('caller_intent', ''), analysis.get('resolution', 'unresolved'),
+                            json.dumps(analysis.get('action_items', [])), json.dumps(conv_log),
+                            analysis.get('caller_name', ''), dur,
+                            call_sid))
+
+                # Auto-create ticket
+                if analysis.get('should_create_ticket') and analysis.get('ticket_data'):
+                    td = analysis['ticket_data']
+                    execute_db("""INSERT INTO tickets (business_id, call_id, type, priority, subject,
+                                  description, caller_name, caller_number)
+                                  VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+                               (biz_id, str(call['id']), td.get('type', 'enquiry'),
+                                td.get('priority', 'normal'), td.get('subject', 'New ticket'),
+                                td.get('description', ''), td.get('caller_name', ''),
+                                call.get('caller_number', '')))
+
+                # Update minutes
+                if dur > 0:
+                    add_call_minutes(biz_id, dur)
+            else:
+                print(f"[finalize] Analysis returned None for {call_sid}")
+                execute_db("UPDATE calls SET conversation_log=%s WHERE twilio_call_sid=%s",
+                           (json.dumps(conv_log), call_sid))
+        except Exception as e:
+            print(f"[finalize] Error for {call_sid}: {e}")
+            import traceback
+            traceback.print_exc()
+
+    # Run in background thread so TwiML response isn't delayed
+    threading.Thread(target=_run_analysis, daemon=True).start()
+    return True
+
+
+# ───────────────────────────────────────────
 # TWILIO WEBHOOKS — THE CALL ENGINE (Standard tier)
 # ───────────────────────────────────────────
 
@@ -959,12 +1078,22 @@ def webhook_gather_response():
     biz_id = request.args.get('business_id', '')
     call_sid = request.args.get('call_sid', '')
     turn = int(request.args.get('turn', 0))
+    silence_count = int(request.args.get('silence', 0))
 
+    # No speech detected
     if not speech_result:
+        silence_count += 1
+        if silence_count >= 3:
+            # 3 silences — end the call and finalize
+            finalize_call(call_sid, biz_id)
+            resp = VoiceResponse()
+            resp.say("It seems like you're no longer there. Thank you for calling. Goodbye!", voice='Polly.Amy')
+            resp.hangup()
+            return Response(str(resp), mimetype='text/xml')
         resp = VoiceResponse()
         resp.say("I didn't catch that. Could you please repeat?", voice='Polly.Amy')
         g = resp.gather(input='speech',
-                   action=f"/webhook/gather-response?business_id={biz_id}&call_sid={call_sid}&turn={turn}",
+                   action=f"/webhook/gather-response?business_id={biz_id}&call_sid={call_sid}&turn={turn}&silence={silence_count}",
                    method='POST', timeout=5, speech_timeout='3', language='en-GB')
         return Response(str(resp), mimetype='text/xml')
 
@@ -982,6 +1111,17 @@ def webhook_gather_response():
         if call_row2 and call_row2['conversation_log']:
             conv_log = safe_json(call_row2['conversation_log'], [])
     conv_log.append({'role': 'Caller', 'text': speech_result})
+
+    # ── GOODBYE DETECTION ──
+    if is_goodbye(speech_result):
+        conv_log.append({'role': 'Agent', 'text': 'Thank you for calling. Have a great day!'})
+        cache_set(f"conv:{call_sid}", conv_log, ex=1800)
+        execute_db("UPDATE calls SET conversation_log=%s WHERE twilio_call_sid=%s", (json.dumps(conv_log), call_sid))
+        finalize_call(call_sid, biz_id)
+        resp = VoiceResponse()
+        resp.say("Thank you for calling. Have a great day! Goodbye.", voice='Polly.Amy')
+        resp.hangup()
+        return Response(str(resp), mimetype='text/xml')
 
     # Get caller history from cache
     caller_hist = cache_get(f"caller_hist:{call_sid}", as_json=True)
@@ -1028,8 +1168,9 @@ def webhook_gather_response():
     # Persist to DB so status webhook can read it (multi-worker)
     execute_db("UPDATE calls SET conversation_log=%s WHERE twilio_call_sid=%s", (json.dumps(conv_log), call_sid))
 
-    # Max 15 turns then end gracefully
+    # Max 15 turns then end gracefully with analysis
     if turn >= 15:
+        finalize_call(call_sid, biz_id)
         resp = VoiceResponse()
         resp.say(ai_response + " Thank you for calling. Have a great day!", voice='Polly.Amy')
         resp.hangup()
@@ -1055,7 +1196,7 @@ def webhook_transfer():
 
 @app.route('/webhook/call-status', methods=['POST', 'GET'])
 def webhook_call_status():
-    """Twilio status callback — fires when call completes."""
+    """Twilio status callback — backup for when inline finalization misses."""
     call_sid = request.values.get('CallSid', '')
     status = request.values.get('CallStatus', '')
     duration = int(request.values.get('CallDuration', 0) or 0)
@@ -1069,39 +1210,38 @@ def webhook_call_status():
 
         biz_id = str(call['business_id'])
 
-        # Always update status first
+        # If already finalized by inline analysis, just update duration
+        if call.get('status') == 'completed' and call.get('summary'):
+            print(f"[call-status] Already finalized, updating duration only")
+            execute_db("UPDATE calls SET duration_seconds=%s WHERE twilio_call_sid=%s", (duration, call_sid))
+            if duration > 0:
+                add_call_minutes(biz_id, duration)
+            return '', 204
+
+        # Not yet finalized — run full analysis
         execute_db("""UPDATE calls SET status='completed', duration_seconds=%s, completed_at=NOW()
                       WHERE twilio_call_sid=%s""", (duration, call_sid))
         print(f"[call-status] Status set to completed for {call_sid}")
 
         try:
-            # Get conversation log from cache or DB
             conv_log = cache_get(f"conv:{call_sid}", as_json=True) or []
             if not conv_log and call.get('conversation_log'):
                 conv_log = safe_json(call['conversation_log'], [])
             print(f"[call-status] Conv log has {len(conv_log)} entries")
 
-            # Get recording URL
             recording_url = twilio_service.get_recording_url(call_sid)
-            print(f"[call-status] Recording URL: {recording_url}")
 
-            # Analyze call with Gemini
             biz = query_db("SELECT * FROM businesses WHERE id=%s", (biz_id,), one=True)
             analysis = None
             if recording_url and biz:
-                print(f"[call-status] Analyzing via recording...")
                 analysis = gemini_service.analyze_call_recording(
                     recording_url, biz['name'], biz.get('business_type', ''))
             elif conv_log and biz:
-                print(f"[call-status] Analyzing via transcript...")
                 transcript = "\n".join(f"{e['role']}: {e['text']}" for e in conv_log)
                 analysis = gemini_service.analyze_call_transcript(
                     transcript, biz['name'], biz.get('business_type', ''))
-            else:
-                print(f"[call-status] No recording and no conv_log — cannot analyze")
 
             if analysis:
-                print(f"[call-status] Analysis done: category={analysis.get('category')}, sentiment={analysis.get('sentiment')}, caller={analysis.get('caller_name','')}")
                 execute_db("""UPDATE calls SET recording_url=%s, transcript=%s, summary=%s,
                               category=%s, sentiment=%s, caller_intent=%s, resolution=%s,
                               action_items=%s, conversation_log=%s, caller_name=%s
@@ -1114,7 +1254,6 @@ def webhook_call_status():
                             analysis.get('caller_name', ''),
                             call_sid))
 
-                # Auto-create ticket if needed
                 if analysis.get('should_create_ticket') and analysis.get('ticket_data'):
                     td = analysis['ticket_data']
                     execute_db("""INSERT INTO tickets (business_id, call_id, type, priority, subject,
@@ -1125,7 +1264,6 @@ def webhook_call_status():
                                 td.get('description', ''), td.get('caller_name', ''),
                                 call.get('caller_number', '')))
             else:
-                print(f"[call-status] Analysis returned None")
                 execute_db("""UPDATE calls SET recording_url=%s, conversation_log=%s
                               WHERE twilio_call_sid=%s""",
                            (recording_url or '', json.dumps(conv_log), call_sid))
@@ -1134,10 +1272,8 @@ def webhook_call_status():
             import traceback
             traceback.print_exc()
 
-        # Update minutes
-        add_call_minutes(biz_id, duration)
-
-        # Decrement active calls
+        if duration > 0:
+            add_call_minutes(biz_id, duration)
         cache_decr(f"active_calls:{biz_id}")
 
     elif status in ('busy', 'no-answer', 'canceled', 'failed'):
@@ -1172,6 +1308,42 @@ def webhook_call_fallback():
 @app.route('/webhook/recording-status', methods=['POST', 'GET'])
 def webhook_recording_status():
     return '', 204
+
+
+@app.route('/webhook/call-end', methods=['POST', 'GET'])
+def webhook_call_end():
+    """Catch-all when gather times out after TwiML goodbye. Triggers finalization."""
+    call_sid = request.args.get('call_sid', '') or request.values.get('CallSid', '')
+    biz_id = request.args.get('business_id', '')
+    if call_sid and biz_id:
+        finalize_call(call_sid, biz_id)
+    return '', 204
+
+
+@app.route('/admin/fix-stuck-calls', methods=['POST', 'GET'])
+@login_required
+@admin_required
+def admin_fix_stuck_calls():
+    """Find calls stuck in_progress for >10 min and finalize them."""
+    stuck = query_db("""
+        SELECT c.*, b.name as business_name
+        FROM calls c JOIN businesses b ON c.business_id=b.id
+        WHERE c.status='in_progress' AND c.created_at < NOW() - INTERVAL '10 minutes'
+        ORDER BY c.created_at DESC LIMIT 50
+    """)
+    fixed = 0
+    for call in (stuck or []):
+        call_sid = call.get('twilio_call_sid', '')
+        biz_id = str(call['business_id'])
+        if call_sid:
+            finalize_call(call_sid, biz_id)
+            fixed += 1
+        else:
+            # No call_sid (shouldn't happen) — just mark completed
+            execute_db("UPDATE calls SET status='completed', completed_at=NOW() WHERE id=%s", (str(call['id']),))
+            fixed += 1
+    flash(f'Fixed {fixed} stuck calls.', 'success')
+    return redirect(url_for('admin_dashboard'))
 
 
 @app.route('/webhook/incoming-sms', methods=['POST', 'GET'])
