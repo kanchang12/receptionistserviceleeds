@@ -150,9 +150,18 @@ def generate_agent_response(caller_input, business_config, conversation_log=None
             conv_text += f"{entry.get('role','')}: {entry.get('text','')}\n"
 
     # Build caller history context
-    history_text = "No previous calls from this number."
+    history_text = "No previous calls from this number. This is a new caller."
+    known_name = ""
     if caller_history:
-        history_text = "Previous calls from this caller:\n"
+        # Extract known name from previous calls
+        for h in caller_history:
+            if h.get('caller_name'):
+                known_name = h['caller_name']
+                break
+        if known_name:
+            history_text = f"RETURNING CALLER — Name: {known_name}\nPrevious calls from this caller:\n"
+        else:
+            history_text = "RETURNING CALLER (name unknown) — Previous calls from this caller:\n"
         for h in caller_history:
             history_text += f"- {h.get('date','')}: {h.get('summary','No summary')} (Category: {h.get('category','unknown')}, Sentiment: {h.get('sentiment','unknown')})\n"
 
@@ -166,7 +175,15 @@ def generate_agent_response(caller_input, business_config, conversation_log=None
         for doc in config['knowledge_base'][:5]:
             kb_text += f"--- {doc.get('title','')}: {doc.get('content','')}\n"
 
-    prompt = f"""CALLER HISTORY:
+    # Build name rule based on whether we know the caller
+    if known_name:
+        name_rule = f"- IMPORTANT: This is a RETURNING caller named {known_name}. Greet them by name. Do NOT ask for their name — you already know it."
+    else:
+        name_rule = "- If this is the start of the conversation (turn 0 or 1), politely ask the caller for their name early on."
+
+    prompt = f"""CALLER PHONE NUMBER: {config.get('caller_number', 'unknown')}
+
+CALLER HISTORY:
 {history_text}
 
 CURRENT CONVERSATION:
@@ -186,9 +203,9 @@ Restricted info (NEVER share): {config.get('restricted_info', 'None')}
 Special instructions: {config.get('special_instructions', 'None')}
 
 RULES:
-- IMPORTANT: If this is the start of the conversation (turn 0 or 1), politely ask the caller for their name early on.
+{name_rule}
 - NEVER repeat the greeting. If the conversation already shows you greeted, move forward — do NOT say hello/how are you again.
-- Use caller history to personalize. If they called before, acknowledge it naturally.
+- If this is a RETURNING caller, acknowledge it naturally. Reference their previous calls if relevant.
 - Respond in 1-3 sentences. Be warm, helpful, concise.
 - If you can't help, offer to transfer.
 - NEVER share restricted information.
