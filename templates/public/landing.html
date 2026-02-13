@@ -411,53 +411,47 @@
     <div class="wrap">
         <div class="L-center" style="margin-bottom:12px">
             <div class="L-label">Pricing</div>
-            <h2 class="L-title">Simple pricing. No hidden fees.</h2>
-            <p class="L-subtitle">Start free. Scale when ready. Cancel anytime.</p>
+            <h2 class="L-title">Two tiers. One mission: never miss a call.</h2>
+            <p class="L-subtitle">Start with Standard. Upgrade to Prime for premium voice AI.</p>
         </div>
-        <div class="L-pricing">
-            <div class="L-price-card">
-                <div class="L-price-tier">Starter</div>
-                <div class="L-price-amt">&pound;29<span>/mo</span></div>
-                <div class="L-price-desc">For small businesses getting started</div>
+        <div class="L-pricing" style="display:flex;gap:24px;justify-content:center;flex-wrap:wrap;">
+            <!-- STANDARD -->
+            <div class="L-price-card" style="flex:1;max-width:380px;">
+                <div class="L-price-tier">Standard</div>
+                <div class="L-price-amt">&pound;17<span>/mo</span></div>
+                <div class="L-price-desc">Gemini AI &mdash; smart, reliable, affordable</div>
                 <ul class="L-price-list">
-                    <li>200 minutes/month</li>
+                    <li>120 minutes/month</li>
                     <li>1 phone number</li>
-                    <li>Recording &amp; transcription</li>
+                    <li>Gemini AI voice conversations</li>
+                    <li>Call recording &amp; transcription</li>
                     <li>Automatic ticketing</li>
-                    <li>Knowledge base</li>
+                    <li>Sentiment analysis</li>
+                    <li>Caller recognition</li>
                     <li>Dashboard &amp; analytics</li>
                 </ul>
                 <a href="{{ url_for('register') }}" class="btn btn-secondary btn-block">Start Free Trial</a>
+                <p style="font-size:0.75rem;color:var(--text-muted);margin-top:10px;text-align:center;">Perfect for small businesses, tradespeople, salons</p>
             </div>
-            <div class="L-price-card pop">
-                <div class="L-price-tier">Growth</div>
+            <!-- PRIME -->
+            <div class="L-price-card pop" style="flex:1;max-width:380px;">
+                <div class="L-price-tier" style="color:#a855f7;">&#9733; Prime</div>
                 <div class="L-price-amt">&pound;79<span>/mo</span></div>
-                <div class="L-price-desc">For busy businesses</div>
+                <div class="L-price-desc">Premium Voice AI &mdash; powered by ElevenLabs</div>
                 <ul class="L-price-list">
-                    <li>600 minutes/month</li>
-                    <li>2 phone numbers</li>
-                    <li>Everything in Starter</li>
-                    <li>Caller recognition</li>
-                    <li>Sentiment analysis</li>
-                    <li>SMS notifications</li>
+                    <li><strong>Everything in Standard, plus:</strong></li>
+                    <li>200 minutes/month (500 on Pro, 1200 Enterprise)</li>
+                    <li>2+ phone numbers</li>
+                    <li>Ultra-natural voice quality</li>
+                    <li>Built-in knowledge base</li>
+                    <li>Calendar integration</li>
+                    <li>Appointment booking</li>
                     <li>Priority support</li>
                 </ul>
                 <a href="{{ url_for('register') }}" class="btn btn-primary btn-block">Start Free Trial</a>
-            </div>
-            <div class="L-price-card">
-                <div class="L-price-tier">Enterprise</div>
-                <div class="L-price-amt">&pound;199<span>/mo</span></div>
-                <div class="L-price-desc">Multi-location &amp; high-volume</div>
-                <ul class="L-price-list">
-                    <li>2,000 minutes/month</li>
-                    <li>5 phone numbers</li>
-                    <li>Everything in Growth</li>
-                    <li>API access</li>
-                    <li>Custom integrations</li>
-                    <li>White-label option</li>
-                    <li>Dedicated account manager</li>
-                </ul>
-                <a href="{{ url_for('register') }}" class="btn btn-secondary btn-block">Contact Sales</a>
+                <p style="font-size:0.75rem;color:var(--text-muted);margin-top:10px;text-align:center;">
+                    Also: <strong>Prime Pro &pound;149/mo</strong> (500 min) &middot; <strong>Prime Enterprise &pound;249/mo</strong> (1200 min)
+                </p>
             </div>
         </div>
     </div>
